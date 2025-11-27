@@ -1,0 +1,55 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE/editor folders
+.idea/
+.vscode/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# Dependency & package directories
+node_modules/
+vendor/
+
+# Python cache (helper scripts)
+__pycache__/
+*.py[cod]
+
+# Local environment/config secrets
+.env
+.env.*
+*.local
+
+# Logs and runtime caches
+*.log
+*.tmp
+*.cache
+*.swp
+*.swo
+/php/logs/
+
+# User-uploaded or generated files
+/uploads/
+/php/uploads/
+/data/uploaded_files/
+
+# Backup archives & exports
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bak
+*.old
+
+# Build outputs (add more if build tooling is introduced)
+dist/
+build/
+public/dist/
+
+

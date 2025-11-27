@@ -1,0 +1,15 @@
+<div class="col-12 d-flex align-items-stretch">
+        <div class="card custom-card border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 "><i class="ri ri-shield-user-line me-2"></i>Manage Employee Status</h5>
+                    <a class="btn btn-sm btn-icon rounded-pill btn-primary-light float-end permissionRoleProfileModal"  href="#permissionRoleProfileModal" data-bs-toggle="modal"  > 
+                        <i class="ti ti-plus"></i> 
+                    </a> 
+                  
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>

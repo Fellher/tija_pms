@@ -1,0 +1,749 @@
+.TP-setup {
+	float: left;
+
+	height: 45px;
+	border-bottom: 1px solid #e5e5e5;
+	font: italic normal 35px / 40px Georgia, 'Times New Roman', Times, serif;
+}
+
+/* Font Weight csss */
+.t200 {
+	font-weight: 200 !important;
+}
+
+.t300 {
+	font-weight: 300 !important;
+}
+
+.t400 {
+	font-weight: 400 !important;
+}
+
+.t500 {
+	font-weight: 500 !important;
+}
+
+.t600 {
+	font-weight: 600 !important;
+}
+
+.t700 {
+	font-weight: 700 !important;
+}
+
+.p-less p {
+	margin-bottom: 10px !important;
+}
+.p-none p {
+	margin-bottom: 2px !important;
+}
+
+/** Form conntol size extension
+ * ************************************/
+
+.form-control-xs {
+	min-height: calc(1.15em + 0.5rem + 2px) !important;
+	padding: 0.15rem 0.5rem !important;
+	font-size: 0.675rem !important;
+	border-radius: 0.25rem !important;
+}
+.form-control-xs::-webkit-file-upload-button {
+	padding: 0.15rem 0.5rem;
+	margin: -0.15rem -0.5rem;
+	-webkit-margin-end: 0.5rem;
+	margin-inline-end: 0.5rem;
+}
+.form-control-xs::file-selector-button {
+	padding: 0.15rem 0.5rem;
+	margin: -0.15rem -0.5rem;
+	-webkit-margin-end: 0.5rem;
+	margin-inline-end: 0.5rem;
+}
+.bg-light-blue {
+	background: #e5f5ff !important;
+}
+
+.bg-light-orange {
+	background: #fd7e1473 !important;
+	color: #000 !important;
+}
+
+.bg-light-green {
+	background: #caeec2 !important;
+	color: #000 !important;
+}
+.table-xs > :not(caption) > * > * {
+	padding: 0.15rem 0.25rem !important;
+}
+.code-list li {
+	margin-left: 30px;
+}
+
+/* Path: assets/css/custom.css */
+
+/*manage font sizes
+*************************************/
+.font-xl {
+	font-size: 3rem !important;
+}
+.font-lg {
+	font-size: 2.3rem !important;
+}
+
+.font-mid-lg {
+	font-size: 1.5rem !important;
+}
+.font-28 {
+	font-size: 28px !important;
+}
+.font-26 {
+	font-size: 26px !important;
+}
+
+.font-24 {
+	font-size: 24px !important;
+}
+
+.font-22 {
+	font-size: 22px !important;
+}
+.font-20 {
+	font-size: 20px !important;
+}
+
+.font-18 {
+	font-size: 18px !important;
+}
+
+.font-16 {
+	font-size: 16px !important;
+}
+.font-13 {
+	font-size: 13px !important;
+}
+
+.font-14 {
+	font-size: 14px !important;
+}
+.font-12 {
+	font-size: 12px !important;
+}
+.nobg {
+	background: none !important;
+}
+
+/** Form conntol size extension
+* ************************************/
+
+.form-control-xs {
+	min-height: calc(1.15em + 0.5rem + 2px);
+	padding: 0.15rem 0.5rem;
+	font-size: 0.675rem;
+	border-radius: 0.25rem;
+}
+.form-select-xs {
+	min-height: calc(1.15em + 0.5rem + 2px);
+	padding-top: 0.25rem !important;
+	padding-bottom: 0.25rem !important;
+}
+
+.form-control-xs::-webkit-file-upload-button {
+	padding: 0.15rem 0.5rem;
+	margin: -0.15rem -0.5rem;
+	-webkit-margin-end: 0.5rem;
+	margin-inline-end: 0.5rem;
+}
+.form-control-xs::file-selector-button {
+	padding: 0.15rem 0.5rem;
+	margin: -0.15rem -0.5rem;
+	-webkit-margin-end: 0.5rem;
+	margin-inline-end: 0.5rem;
+}
+.bg-light-blue {
+	background: #e5f5ff !important;
+}
+
+.bg-light-orange {
+	background: #fd7e1473 !important;
+	color: #000 !important;
+}
+
+.bg-light-green {
+	background: #caeec2 !important;
+	color: #000 !important;
+}
+.table-xs > :not(caption) > * > * {
+	padding: 0.15rem 0.25rem;
+}
+.code-list li {
+	margin-left: 30px;
+}
+
+.btn-xs,
+.btn-group-xs > .btn {
+	--bs-btn-padding-y: 0.1rem !important;
+	--bs-btn-padding-x: 0.5rem !important;
+	--bs-btn-font-size: 0.75rem !important;
+	--bs-btn-border-radius: var(--bs-border-radius-sm) !important;
+}
+
+.btn-xxs,
+.btn-group-xxs > .btn {
+	--bs-btn-padding-y: 0.08rem;
+	--bs-btn-padding-x: 0.57rem;
+	--bs-btn-font-size: 0.75rem;
+	--bs-btn-border-radius: 0.25rem;
+}
+
+.form-control-xs {
+	min-height: calc(1em + 0.5rem + 2px);
+	padding: 0.05rem 0.5rem;
+	font-size: 0.875rem;
+	border-radius: 0.25rem;
+}
+
+.bs-blue {
+	background-color: var(--bs-blue);
+}
+
+.bs-indigo {
+	background-color: var(--bs-indigo);
+}
+.bs-purple {
+	background-color: var(--bs-purple);
+}
+
+.bs-pink {
+	background-color: var(--bs-pink);
+}
+
+.bs-red {
+	background-color: var(--bs-red);
+}
+
+.bs-orange {
+	background-color: var(--bs-orange);
+}
+
+.bs-yellow {
+	background-color: var(--bs-yellow);
+}
+.bs-green {
+	background-color: var(--bs-green);
+}
+
+.bs-teal {
+	background-color: var(--bs-teal);
+}
+
+.bs-cyan {
+	background-color: var(--bs-cyan);
+}
+
+.bs-black {
+	background-color: var(--bs-black);
+}
+
+.bs-gray {
+	background-color: var(--bs-gray);
+}
+
+.bs-gray-dark {
+	background-color: var(--bs-gray-dark);
+}
+
+.bs-gray-100 {
+	background-color: var(--bs-gray-100);
+}
+
+.bs-gray-200 {
+	background-color: var(--bs-gray-200);
+}
+
+.bs-gray-300 {
+	background-color: var(--bs-gray-300);
+}
+
+.bs-gray-400 {
+	background-color: var(--bs-gray-400);
+}
+
+.bs-gray-500 {
+	background-color: var(--bs-gray-500);
+}
+
+.bs-gray-600 {
+	background-color: var(--bs-gray-600);
+}
+.bs-gray-700 {
+	background-color: var(--bs-gray-700);
+}
+.bs-gray-800 {
+	background-color: var(--bs-gray-800);
+}
+.bs-gray-900 {
+	background-color: var(--bs-gray-900);
+}
+
+.custom-tooltip {
+	--bs-tooltip-bg: var(--bs-primary);
+}
+.academic-icon {
+	display: inline-block;
+	width: 5rem;
+	height: 5rem;
+	margin: 0.25rem;
+}
+
+.community-icon {
+	display: inline-block;
+	width: 6rem;
+	height: 6rem;
+	margin: 0.25rem;
+}
+.numberIn span {
+	cursor: pointer;
+}
+
+.minus,
+.plus {
+	width: 40px;
+	height: 28px;
+	background: #f2f2f2;
+	border-radius: 3px;
+	padding: 6px 4px 6px 4px;
+	border: 1px solid #ddd;
+	display: inline-block;
+	vertical-align: middle;
+	text-align: center;
+}
+.numberIn input {
+	height: 28px;
+	width: 60px;
+	text-align: center;
+	font-size: 18px;
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	display: inline-block;
+	vertical-align: middle;
+}
+.white-section {
+	background-color: #fff;
+	padding: 25px 20px;
+	-webkit-box-shadow: 0px 1px 1px 0px #dfdfdf;
+	box-shadow: 0px 1px 1px 0px #dfdfdf;
+	border-radius: 3px;
+}
+
+.white-section label {
+	margin-bottom: 30px;
+}
+
+.dark .white-section {
+	background-color: #333;
+	-webkit-box-shadow: 0px 1px 1px 0px #444;
+	box-shadow: 0px 1px 1px 0px #444;
+}
+
+.box1,
+.box2,
+.box3,
+.box4,
+.box5,
+.box6,
+.box7,
+.box8,
+.box9 {
+	background-color: #ffffff;
+	border-radius: 10px;
+	overflow: hidden;
+	height: 200px;
+	max-height: 35vh;
+	border: 1px solid;
+}
+.box {
+	margin: 10px;
+}
+
+.grid {
+	min-height: 100%;
+	display: flex;
+	flex-wrap: wrap;
+	flex-direction: row;
+}
+
+/*.grid > div {
+   flex-basis:  calc(33.333333% = 40px);
+ }*/
+.top-down {
+	writing-mode: vertical-rl;
+	text-orientation: upright;
+}
+.w-15 {
+	width: 15% !important;
+}
+@media (min-width: 992px) {
+	.w-lg-15 {
+		width: 15% !important;
+	}
+}
+
+@media (min-width: 768px) {
+	.w-md-15 {
+		width: 15% !important;
+	}
+}
+.kpi-item:hover {
+	background: #f3fbff !important;
+	/* border: 1px solid #0089d9 !important; */
+	cursor: pointer !important;
+}
+
+.dayover {
+	background-image: linear-gradient(0deg, #f3f5f6, #fff);
+}
+
+.dayover:hover,
+.dayover.active {
+	background-image: linear-gradient(0deg, #add8e6, #cce5ff);
+	color: #000;
+	border: 1px solid #0089d9;
+}
+
+.dayover.active {
+	background-image: linear-gradient(0deg, #add8e6, #cce5ff);
+	color: #000;
+	border: 1px solid #0089d9;
+}
+
+.activeDay {
+	background-image: linear-gradient(0deg, #0089d9, #0974b3);
+	border: 1px solid #0089d9;
+	color: #000;
+}
+
+.kanban {
+	display: flex;
+	justify-content: space-between;
+}
+.column {
+	width: 15%;
+	background-color: #f0f0f0;
+	border: 1px solid #ccc;
+	border-radius: 5px;
+	padding: 10px;
+	margin: 5px;
+}
+.column h2 {
+	text-align: center;
+}
+.activity {
+	background-color: #fff;
+	border: 1px solid #ccc;
+	border-radius: 3px;
+	padding: 5px;
+	margin: 5px 0;
+}
+
+/* Custom CSS for the Chevron Progress Bar */
+.progress-bar-custom {
+	display: flex;
+	border-radius: 0.375rem; /* Bootstrap 'rounded-2' is 0.5rem, 'rounded' is 0.25rem. This is in between. */
+	overflow: hidden; /* Important for the chevron effect with border-radius */
+	box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); /* Bootstrap shadow-lg equivalent */
+}
+
+.step-custom {
+	flex: 1; /* Each step takes equal width */
+	position: relative; /* For pseudo-elements and z-index */
+	padding: 1em 1em 1em 2em; /* Top, Right, Bottom, Left. More left padding for the arrow. */
+	color: #212529; /* Bootstrap default text color, or a gray like #495057 (text-secondary) */
+	background-color: #e9ecef; /* Bootstrap gray-200 equivalent for future steps */
+	text-align: center;
+	cursor: pointer;
+	transition: background-color 0.4s ease, color 0.4s ease;
+	min-height: 75px; /* Consistent height for arrows, adjust as needed */
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+/* Overlap subsequent steps to create the connected chevron look */
+.step-custom:not(:first-child) {
+	margin-left: -1.3em; /* Overlap amount, should be related to arrow width. */
+}
+
+.step-custom-content {
+	position: relative; /* To ensure it's above the pseudo-element if needed */
+	z-index: 2; /* Above the ::after arrow */
+}
+
+.step-custom-label {
+	font-weight: 600; /* Bootstrap fw-semibold */
+	font-size: 0.9rem;
+	line-height: 1.2;
+	margin-bottom: 0.25em;
+}
+
+.step-custom-details {
+	font-size: 0.75rem;
+	line-height: 1;
+	color: #6c757d; /* Bootstrap text-muted or text-secondary */
+}
+
+/* Arrow shape using ::after pseudo-element */
+.step-custom::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: -1.3em; /* Should match negative margin-left of next step for seamless connection. Arrow width. */
+	width: 0;
+	height: 0;
+	/* Creates a triangle. Height of step is min-height: 75px. So half is 37.5px. */
+	border-top: 37.5px solid transparent;
+	border-bottom: 37.5px solid transparent;
+	border-left-width: 1.3em;
+	border-left-style: solid;
+	/* border-left-color is set based on step state below */
+	z-index: 1; /* Below step content, above next step's edge */
+}
+
+/* Specific z-indexing for steps to ensure left-to-right overlap of arrows */
+.step-custom:nth-child(1) {
+	z-index: 4;
+}
+.step-custom:nth-child(2) {
+	z-index: 3;
+}
+.step-custom:nth-child(3) {
+	z-index: 2;
+}
+.step-custom:nth-child(4) {
+	z-index: 1;
+}
+
+/* First step specific styling */
+.step-custom:first-child {
+	padding-left: 1.5em; /* Normal padding for the first item */
+	border-top-left-radius: 0.375rem;
+	border-bottom-left-radius: 0.375rem;
+}
+
+/* Last step specific styling */
+.step-custom:last-child::after {
+	display: none; /* No arrow for the last step */
+}
+.step-custom:last-child {
+	padding-right: 1.5em; /* Normal padding for the last item */
+	border-top-right-radius: 0.375rem;
+	border-bottom-right-radius: 0.375rem;
+}
+
+/* State-specific styling */
+.step-custom.future {
+	background-color: #e9ecef; /* Bootstrap gray-200 */
+	color: #212529; /* Default text color */
+}
+.step-custom.future .step-custom-details {
+	color: #6c757d; /* Bootstrap text-muted */
+}
+.step-custom.future::after {
+	border-left-color: #e9ecef; /* Bootstrap gray-200 */
+}
+
+.step-custom.active,
+.step-custom.completed {
+	background-color: #0d6efd; /* Bootstrap primary blue */
+	color: white;
+}
+.step-custom.active .step-custom-details,
+.step-custom.completed .step-custom-details {
+	color: rgba(
+		255,
+		255,
+		255,
+		0.75
+	); /* Lighter text for details on dark background */
+}
+.step-custom.active::after,
+.step-custom.completed::after {
+	border-left-color: #0d6efd; /* Bootstrap primary blue */
+}
+
+/* .kanban-board {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 20px;
+}
+
+.kanban-col {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.kanban-card {
+	padding: 10px;
+	border: 1px solid #ddd;
+	border-radius: 5px;
+	background-color: #f9f9f9;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+} */
+/* File upload icon button only */
+
+/* Styles for the icon-only upload button */
+.upload-wrapper {
+	display: flex;
+	flex-direction: column; /* Stack button and info */
+	align-items: center;
+	padding: 2rem;
+	background-color: #ffffff;
+	border-radius: 0.5rem;
+	box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+/* Styles for the icon-only upload button */
+.file-upload-container {
+	display: flex;
+	align-items: center;
+	margin-bottom: 0.75rem; /* Space between icon and file name if shown below */
+}
+
+.file-upload-input {
+	display: none; /* Hide the actual file input */
+}
+
+.file-upload-label {
+	display: inline-block;
+	padding: 0.5rem 0.85rem; /* Adjusted padding for a nice circular/square feel */
+	font-size: 1.75rem; /* Larger icon */
+	color: #0d6efd; /* Bootstrap primary color for the icon */
+	background-color: #e9ecef; /* Light background for better visibility */
+	border: 1px solid #dee2e6; /* Subtle border */
+	border-radius: 0.375rem; /* Standard Bootstrap rounded corners */
+	cursor: pointer;
+	transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+		border-color 0.15s ease-in-out;
+}
+
+.file-upload-label:hover {
+	color: #ffffff;
+	background-color: #0d6efd; /* Primary color on hover */
+	border-color: #0a58ca;
+}
+
+#fileNameDisplay {
+	margin-top: 0.5rem; /* Space above the file name */
+	font-size: 0.875rem;
+	color: #6c757d; /* Bootstrap secondary text color */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 250px; /* Adjust as needed */
+	text-align: center;
+}
+/* .file-upload-icon {
+	position: relative;
+	display: inline-block;
+	cursor: pointer;
+ }
+ 
+ .file-upload-icon::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	
+ }	
+
+ .file-upload-icon::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+ }
+
+ .file-upload-icon::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+ }
+  */
+/* Spinner Styles (largely unchanged) */
+#page-spinner {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(
+		255,
+		255,
+		255,
+		0.8
+	); /* Slightly more opaque for better visibility over Bootstrap components */
+	z-index: 1056; /* Bootstrap's modal z-index is 1050-1055, so place spinner above */
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+#page-spinner.show {
+	visibility: visible;
+	opacity: 1;
+}
+
+.spinner-icon {
+	/* Using Bootstrap's spinner class for consistency, or keep custom */
+	/* For custom spinner: */
+	/* border: 8px solid #f3f3f3; */
+	/* border-top: 8px solid #0d6efd; */ /* Bootstrap primary color */
+	/* border-radius: 50%; */
+	/* width: 60px; */
+	/* height: 60px; */
+	/* animation: spin 1s linear infinite; */
+
+	/* Using Bootstrap's spinner component: */
+	width: 3rem; /* Adjust size as needed */
+	height: 3rem;
+	border-width: 0.25em;
+}
+
+/* Custom animation if not using Bootstrap's spinner directly in HTML */
+/* @keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+} */
+
+/* Page Content Styles (adjusting for Bootstrap) */
+body {
+	background-color: #f8f9fa; /* Bootstrap's light gray background */
+	padding-top: 20px; /* Add some padding at the top */
+	padding-bottom: 20px; /* Add some padding at the bottom */
+}
+/* .content class is replaced by Bootstrap's container */
+
+.output {
+	/* Kept custom styling for the output div as it was specific */
+	margin-top: 20px;
+	padding: 15px;
+	background-color: #e9ecef;
+	border-radius: 0.375rem; /* Bootstrap's default border-radius */
+	min-height: 50px;
+}
+
+/* .form-check:hover label {
+	background-color: #007bff;
+}
+.form-check:hover label i {
+	color: #fff;
+}
+.form-check input:checked + label {
+	background-color: #b8daff;
+} */
