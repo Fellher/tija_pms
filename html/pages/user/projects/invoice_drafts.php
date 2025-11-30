@@ -84,7 +84,7 @@ if ($billingCycles && is_array($billingCycles)) {
 $allDraftItems = array_merge($draftInvoices, $cyclesNeedingDrafts);
 
 $pageTitle = "Invoice Drafts - Recurring Projects";
-include 'html/includes/header.php';
+// Header is automatically included in index.php
 ?>
 
 <div class="main-content">
@@ -326,5 +326,5 @@ function rejectInvoice(invoiceID) {
 }
 </script>
 
-<?php include 'html/includes/footer.php'; ?>
+<?php // Footer is automatically included in index.php ?>
 

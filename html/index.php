@@ -146,6 +146,39 @@ $nodeID="";
 						<?php
 			}
 						include 'includes/flash_messages.php';
+
+						// Display pending operational tasks alert (only on dashboard/home pages)
+						if ($isValidUser && isset($userID) && ($p == 'home' || $p == 'dashboard' || ($s == 'user' && !isset($ss)))) {
+							require_once __DIR__ . '/../php/classes/operationaltaskscheduler.php';
+							$pendingTasks = OperationalTaskScheduler::getPendingTaskNotifications($userID, $DBConn);
+							$pendingCount = is_array($pendingTasks) ? count($pendingTasks) : 0;
+
+							// Check if user has dismissed this alert (stored in session)
+							$alertDismissed = isset($_SESSION['operational_tasks_alert_dismissed']) &&
+											   $_SESSION['operational_tasks_alert_dismissed'] > (time() - 86400); // 24 hours
+
+							if ($pendingCount > 0 && !$alertDismissed): ?>
+								<div class="alert alert-info alert-dismissible fade show mb-3" role="alert" id="operationalTasksAlert">
+									<div class="d-flex align-items-center">
+										<i class="ri-notification-3-line me-2 fs-4"></i>
+										<div class="flex-grow-1">
+											<strong>Pending Scheduled Tasks:</strong> You have
+											<strong><?php echo $pendingCount; ?></strong> scheduled task(s) ready to be processed.
+											<a href="<?php echo $base; ?>html/?s=user&ss=operational&p=pending_tasks" class="alert-link fw-semibold">View and Process Now</a>
+										</div>
+									</div>
+									<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" onclick="dismissOperationalAlert()"></button>
+								</div>
+								<script>
+								function dismissOperationalAlert() {
+									fetch('<?php echo $base; ?>php/scripts/operational/tasks/dismiss_alert.php', {
+										method: 'POST'
+									});
+								}
+								</script>
+							<?php endif;
+						}
+
 						//! Load Page contents here
 						$pageURI = File::path_join('pages/', $s, $ss, $sss, $p . '.php') ;
 						if (file_exists($pageURI)) {

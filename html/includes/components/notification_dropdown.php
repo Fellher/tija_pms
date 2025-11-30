@@ -15,6 +15,36 @@ if ($isValidUser) {
         // If notification system not installed or error, default to 0
         $unreadCount = 0;
     }
+
+    // Get operational task notifications count
+    $operationalTaskCount = 0;
+    try {
+        // Check if class exists (may not be available if operational tasks module not fully set up)
+        if (!class_exists('OperationalTaskScheduler')) {
+            // Try to load the class using base path
+            // notification_dropdown.php is in html/includes/components/
+            // We need to go up 3 levels to get to project root
+            $basePath = dirname(dirname(dirname(__DIR__)));
+            $schedulerPath = $basePath . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR . 'operationaltaskscheduler.php';
+            if (file_exists($schedulerPath)) {
+                require_once $schedulerPath;
+            }
+        }
+
+        if (class_exists('OperationalTaskScheduler')) {
+            $operationalNotifications = OperationalTaskScheduler::getPendingTaskNotifications($userID, $DBConn);
+            $operationalTaskCount = is_array($operationalNotifications) ? count($operationalNotifications) : 0;
+        }
+    } catch (Exception $e) {
+        // Silently fail if operational tasks not available
+        $operationalTaskCount = 0;
+    } catch (Error $e) {
+        // Handle fatal errors (class not found, etc.)
+        $operationalTaskCount = 0;
+    }
+
+    // Total unread count includes operational tasks
+    $totalUnreadCount = $unreadCount + $operationalTaskCount;
 ?>
 
 <style>
@@ -194,6 +224,56 @@ if ($isValidUser) {
     text-decoration: underline;
 }
 
+/* Operational task quick action button */
+.notification-dropdown-item {
+    position: relative;
+}
+
+.notification-dropdown-item .btn.process-task-quick {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px 12px;
+    font-size: 11px;
+    line-height: 1.4;
+    z-index: 10;
+}
+
+/* Divider for notification sections */
+.notification-dropdown-divider {
+    padding: 8px 16px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+    margin: 4px 0;
+}
+
+.notification-dropdown-divider .divider-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Link item in dropdown */
+.notification-dropdown-link {
+    display: block;
+    padding: 12px 16px;
+    color: #667eea;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    border-top: 1px solid #e9ecef;
+    transition: background 0.2s;
+}
+
+.notification-dropdown-link:hover {
+    background: #f8f9fa;
+    color: #5568d3;
+}
+
 .notification-dropdown-empty {
     padding: 40px 20px;
     text-align: center;
@@ -248,8 +328,8 @@ if ($isValidUser) {
 <!-- Start::header-link|dropdown-toggle -->
 <a href="javascript:void(0);" class="header-link" id="notificationBell">
     <i class="ri-notification-3-line header-link-icon animate-bell"></i>
-    <span class="badge bg-success rounded-pill header-icon-badge pulse pulse-success" id="notificationBadge" style="<?php echo $unreadCount == 0 ? 'display: none;' : ''; ?>">
-        <?php echo $unreadCount; ?>
+    <span class="badge bg-success rounded-pill header-icon-badge pulse pulse-success" id="notificationBadge" style="<?php echo $totalUnreadCount == 0 ? 'display: none;' : ''; ?>">
+        <?php echo $totalUnreadCount; ?>
     </span>
 </a>
 <!-- End::header-link|dropdown-toggle -->
@@ -354,21 +434,77 @@ if ($isValidUser) {
             </div>
         `;
 
-        fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=10')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderNotifications(data.notifications);
-                    updateBadge(data.unreadCount);
-                    notificationsLoaded = true;
-                } else {
-                    showError('Failed to load notifications');
+        // Load both system notifications and operational tasks
+        Promise.all([
+            fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=8')
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json().catch(() => ({ success: false, notifications: [], unreadCount: 0 }));
+                })
+                .catch(() => ({ success: false, notifications: [], unreadCount: 0 })),
+            fetch('<?php echo $base; ?>php/scripts/operational/tasks/get_pending_notifications.php')
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json().catch(() => ({ success: false, notifications: [], count: 0 }));
+                })
+                .catch(() => ({ success: false, notifications: [], count: 0 }))
+        ])
+        .then(([notifData, taskData]) => {
+            const allNotifications = [];
+
+            // Add system notifications
+            if (notifData.success && notifData.notifications) {
+                notifData.notifications.forEach(n => {
+                    allNotifications.push({
+                        ...n,
+                        type: 'system'
+                    });
+                });
+            }
+
+            // Add operational task notifications
+            if (taskData.success && taskData.notifications && taskData.notifications.length > 0) {
+                // Add section header for operational tasks
+                if (allNotifications.length > 0) {
+                    allNotifications.push({
+                        type: 'divider',
+                        label: 'Operational Tasks'
+                    });
                 }
-            })
-            .catch(error => {
-                console.error('Error loading notifications:', error);
-                showError('Failed to load notifications');
-            });
+
+                taskData.notifications.slice(0, 5).forEach(t => {
+                    allNotifications.push({
+                        notificationID: 'op_' + t.notificationID,
+                        title: 'Scheduled Task Ready',
+                        body: t.templateName + ' - Due: ' + new Date(t.dueDate).toLocaleDateString(),
+                        link: '?s=user&ss=operational&p=pending_tasks',
+                        icon: 'ri-task-line',
+                        priority: 'medium',
+                        status: 'unread',
+                        type: 'operational',
+                        operationalData: t,
+                        timeAgo: 'Ready to process'
+                    });
+                });
+
+                // Add "View All" link if more than 5
+                if (taskData.count > 5) {
+                    allNotifications.push({
+                        type: 'link',
+                        label: 'View all ' + taskData.count + ' pending tasks',
+                        link: '?s=user&ss=operational&p=pending_tasks'
+                    });
+                }
+            }
+
+            renderNotifications(allNotifications);
+            updateBadge((notifData.unreadCount || 0) + (taskData.count || 0));
+            notificationsLoaded = true;
+        })
+        .catch(error => {
+            console.error('Error loading notifications:', error);
+            showError('Failed to load notifications');
+        });
     }
 
     function renderNotifications(notifications) {
@@ -385,15 +521,47 @@ if ($isValidUser) {
         body.innerHTML = '';
 
         notifications.forEach(notif => {
+            // Handle divider
+            if (notif.type === 'divider') {
+                const divider = document.createElement('div');
+                divider.className = 'notification-dropdown-divider';
+                divider.innerHTML = `<div class="divider-label">${notif.label}</div>`;
+                body.appendChild(divider);
+                return;
+            }
+
+            // Handle link item
+            if (notif.type === 'link') {
+                const linkItem = document.createElement('a');
+                linkItem.className = 'notification-dropdown-link';
+                linkItem.href = '<?php echo $base; ?>html/' + notif.link;
+                linkItem.innerHTML = `<i class="ri-arrow-right-line me-2"></i>${notif.label}`;
+                body.appendChild(linkItem);
+                return;
+            }
+
             const item = document.createElement('div');
-            item.className = `notification-dropdown-item ${notif.status}`;
+            item.className = `notification-dropdown-item ${notif.status || 'unread'}`;
             item.dataset.notificationId = notif.notificationID;
+            item.dataset.notificationType = notif.type || 'system';
 
             const icon = notif.icon || 'ri-notification-line';
-            const priorityClass = `priority-${notif.priority}`;
+            const priorityClass = `priority-${notif.priority || 'medium'}`;
 
             // Strip HTML tags from body for dropdown
-            const bodyText = notif.body.replace(/<[^>]*>/g, '');
+            const bodyText = (notif.body || '').replace(/<[^>]*>/g, '');
+
+            // Add quick action button for operational tasks
+            let actionButton = '';
+            if (notif.type === 'operational' && notif.operationalData) {
+                actionButton = `
+                    <button class="btn btn-sm btn-primary process-task-quick"
+                            data-notification-id="${notif.operationalData.notificationID}"
+                            onclick="event.stopPropagation(); processOperationalTask('${notif.operationalData.notificationID}', this);">
+                        <i class="ri-play-line"></i> Process
+                    </button>
+                `;
+            }
 
             item.innerHTML = `
                 <div class="notif-icon ${priorityClass}">
@@ -402,17 +570,66 @@ if ($isValidUser) {
                 <div class="notif-content">
                     <div class="notif-title">${notif.title}</div>
                     <div class="notif-body">${bodyText}</div>
-                    <div class="notif-time">${notif.timeAgo}</div>
+                    <div class="notif-time">${notif.timeAgo || ''}</div>
                 </div>
+                ${actionButton}
             `;
 
-            item.addEventListener('click', function() {
-                handleNotificationClick(notif);
+            item.addEventListener('click', function(e) {
+                // Don't navigate if clicking the action button
+                if (!e.target.closest('.process-task-quick')) {
+                    handleNotificationClick(notif);
+                }
             });
 
             body.appendChild(item);
         });
     }
+
+    // Process operational task from dropdown
+    function processOperationalTask(notificationID, buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.innerHTML = '<i class="ri-loader-4-line"></i>';
+
+        const formData = new URLSearchParams();
+        formData.append('notificationID', notificationID);
+        formData.append('action', 'process');
+
+        fetch('<?php echo $base; ?>php/scripts/operational/tasks/process_pending_task.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString()
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                buttonElement.innerHTML = '<i class="ri-check-line"></i> Done';
+                buttonElement.classList.remove('btn-primary');
+                buttonElement.classList.add('btn-success');
+
+                // Reload notifications after 1 second
+                setTimeout(() => {
+                    notificationsLoaded = false;
+                    loadNotifications();
+                }, 1000);
+            } else {
+                alert('Error: ' + (data.message || 'Failed to process task'));
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = '<i class="ri-play-line"></i> Process';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error processing task. Please try again.');
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = '<i class="ri-play-line"></i> Process';
+        });
+    }
+
+    // Make function globally available
+    window.processOperationalTask = processOperationalTask;
 
     function handleNotificationClick(notif) {
         // Mark as read if unread
@@ -500,19 +717,30 @@ if ($isValidUser) {
         if (isOpen) {
             loadNotifications();
         } else {
-            // Just update the badge count
-            fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=1')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateBadge(data.unreadCount);
-                        // Reset loaded flag if there are new notifications
-                        if (data.unreadCount > 0) {
-                            notificationsLoaded = false;
-                        }
-                    }
-                })
-                .catch(error => console.error('Error updating badge:', error));
+            // Update badge count for both system and operational notifications
+            Promise.all([
+                fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=1')
+                    .then(r => {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json().catch(() => ({ success: false, unreadCount: 0 }));
+                    })
+                    .catch(() => ({ success: false, unreadCount: 0 })),
+                fetch('<?php echo $base; ?>php/scripts/operational/tasks/get_pending_notifications.php')
+                    .then(r => {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json().catch(() => ({ success: false, count: 0 }));
+                    })
+                    .catch(() => ({ success: false, count: 0 }))
+            ])
+            .then(([notifData, taskData]) => {
+                const totalCount = (notifData.unreadCount || 0) + (taskData.count || 0);
+                updateBadge(totalCount);
+                // Reset loaded flag if there are new notifications
+                if (totalCount > 0) {
+                    notificationsLoaded = false;
+                }
+            })
+            .catch(error => console.error('Error updating badge:', error));
         }
     }, 120000); // 2 minutes
 })();

@@ -28,14 +28,13 @@ COMMENT='Stores reusable time entry templates for quick data entry';
 -- =============================================
 -- Uncomment the following to insert sample templates
 
-/*
+
 INSERT INTO `time_entry_templates`
     (`userID`, `templateName`, `templateData`, `createdDate`, `Suspended`)
 VALUES
     (1, 'Daily Standup', '{"projectID":"5","workTypeID":"1","taskDuration":"00:15","taskStatusID":"2","taskNarrative":"Daily standup meeting"}', NOW(), 'N'),
     (1, 'Code Review', '{"projectID":"5","workTypeID":"2","taskDuration":"01:00","taskStatusID":"2","taskNarrative":"Code review session"}', NOW(), 'N'),
-    (1, 'Documentation', '{"projectID":"5","workTypeID":"3","taskDuration":"02:00","taskStatusID":"2","taskNarrative":"Writing technical documentation"}', NOW(), 'N');
-*/
+    (1, 'Documentation', '{"projectID":"5","workTypeID":"3","taskDuration":"02:00","taskStatusID":"2","taskNarrative":"Writing technical documentation"}', NOW(), 'N');z
 
 -- =============================================
 -- Verification Query

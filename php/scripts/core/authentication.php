@@ -53,6 +53,21 @@ if (isset($_SESSION['SessionID'])) {
 		$userNames = implode(' ', $n);
 		$isValidUser = true;
 
+		// Check for pending operational tasks (manual processing mode/ not for admins)
+		if ($isValidUser && !$isValidAdmin) {
+			require_once __DIR__ . '/../../classes/operationaltaskscheduler.php';
+			try {
+				$pendingTasksResult = OperationalTaskScheduler::checkPendingTasksForUser($userDetails->ID, $DBConn);
+				// Store in session for notification display
+				if ($pendingTasksResult['tasksReady'] > 0) {
+					$_SESSION['pendingOperationalTasks'] = $pendingTasksResult['tasksReady'];
+				}
+			} catch (Exception $e) {
+				// Silently fail - don't break login if operational tasks check fails
+				error_log("Operational tasks check failed on login: " . $e->getMessage());
+			}
+		}
+
 		$hrManagerScope = Employee::get_hr_manager_scope($userDetails->ID, $DBConn);
 		if ($hrManagerScope['isHRManager']) {
 			$isHRManager = true;

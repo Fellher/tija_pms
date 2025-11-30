@@ -221,8 +221,26 @@
 		  	foreach ($where as $col=>$val) {
 			 	if ($val == 'NULL' || $val == 'null') {
 					$whereStr .= ($whereStr == '' ? '' : ' AND ') . "ISNULL(`{$col}`) ";
+			 	} elseif (is_array($val)) {
+					// Handle array conditions (IN or BETWEEN)
+					if (isset($val[0]) && $val[0] === 'BETWEEN' && count($val) === 3) {
+						// BETWEEN clause: ['BETWEEN', 'value1', 'value2']
+						$whereStr .= ($whereStr == '' ? '' : ' AND ') . "`{$col}` BETWEEN :{$col}_from AND :{$col}_to";
+						$params[] = array($col . '_from', $val[1]);
+						$params[] = array($col . '_to', $val[2]);
+					} else {
+						// IN clause: ['value1', 'value2', ...]
+						$inPlaceholders = array();
+						foreach ($val as $idx => $inVal) {
+							$placeholder = $col . '_' . $idx;
+							$inPlaceholders[] = ":{$placeholder}";
+							$params[] = array($placeholder, $inVal);
+						}
+						$inClause = implode(', ', $inPlaceholders);
+						$whereStr .= ($whereStr == '' ? '' : ' AND ') . "`{$col}` IN ({$inClause})";
+					}
 			 	} else {
-					$whereStr .= ($whereStr == '' ? '' : ' AND ') . "{$col} = :{$col}";
+					$whereStr .= ($whereStr == '' ? '' : ' AND ') . "`{$col}` = :{$col}";
 					$params[] = array($col, $val);// "`{$col}` , :{$val}";
 			 	}
 		  	}
@@ -258,8 +276,26 @@
 		  	foreach ($where as $col=>$val) {
 			 	if ($val == 'NULL' || $val == 'null') {
 					$whereStr .= ($whereStr == '' ? '' : ' AND ') . "ISNULL(`{$col}`) ";
+			 	} elseif (is_array($val)) {
+					// Handle array conditions (IN or BETWEEN)
+					if (isset($val[0]) && $val[0] === 'BETWEEN' && count($val) === 3) {
+						// BETWEEN clause: ['BETWEEN', 'value1', 'value2']
+						$whereStr .= ($whereStr == '' ? '' : ' AND ') . "`{$col}` BETWEEN :{$col}_from AND :{$col}_to";
+						$params[] = array($col . '_from', $val[1]);
+						$params[] = array($col . '_to', $val[2]);
+					} else {
+						// IN clause: ['value1', 'value2', ...]
+						$inPlaceholders = array();
+						foreach ($val as $idx => $inVal) {
+							$placeholder = $col . '_' . $idx;
+							$inPlaceholders[] = ":{$placeholder}";
+							$params[] = array($placeholder, $inVal);
+						}
+						$inClause = implode(', ', $inPlaceholders);
+						$whereStr .= ($whereStr == '' ? '' : ' AND ') . "`{$col}` IN ({$inClause})";
+					}
 			 	} else {
-					$whereStr .= ($whereStr == '' ? '' : ' AND ') . "{$col} = :{$col}";
+					$whereStr .= ($whereStr == '' ? '' : ' AND ') . "`{$col}` = :{$col}";
 					$params[] = array($col, $val);// "`{$col}` , :{$val}";
 			 	}
 		  	}

@@ -79,10 +79,18 @@ $config['emailPort']=587;
 
 /*File Upload Settings
 ************************************************/
+// Calculate root directory first
+$config['rootDIR'] = dirname(__FILE__, 3) . '/'; // Root directory of the application
+
+// Calculate base path if not already defined
+// $base is typically a relative path from HTML directory to project root (e.g., '../')
+if (!isset($base)) {
+    // Default to relative path from HTML to root
+    $base = '../';
+}
+
 $config['DataDir'] = $base . "data/uploaded_files/";
 $config['uploadDir'] ="data/uploaded_files/";
-
-$config['rootDIR'] = dirname(__FILE__, 3) . '/'; // Root directory of the application
 
 $config['MaxUploadedFileSize'] = 10 * 1024 * 1024;
 $config['ValidFileTypes'] = array(

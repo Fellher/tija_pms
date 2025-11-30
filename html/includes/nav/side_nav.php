@@ -171,6 +171,41 @@
                 </ul>
             </li>
             <!-- End::slide -->
+
+            <!-- Start::slide - Operational Work (User Section) -->
+            <li class="slide has-sub">
+                <a href="javascript:void(0);" class="side-menu__item">
+                    <i class="ri-repeat-line side-menu__icon"></i>
+                    <span class="side-menu__label">Operational Work</span>
+                    <i class="ri ri-arrow-right-s-line side-menu__angle"></i>
+                </a>
+                <ul class="slide-menu child1">
+                    <li class="slide side-menu__label1"><a href="javascript:void(0)">Operational Work</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=dashboard" ?>" class="side-menu__item <?= (isset($p) && $p == 'dashboard' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-dashboard-line me-2"></i>Dashboard
+                    </a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=tasks" ?>" class="side-menu__item <?= (isset($p) && $p == 'tasks' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-task-line me-2"></i>My Tasks
+                    </a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=templates" ?>" class="side-menu__item <?= (isset($p) && $p == 'templates' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-file-copy-line me-2"></i>Templates
+                    </a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=projects" ?>" class="side-menu__item <?= (isset($p) && $p == 'projects' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-folder-line me-2"></i>Operational Projects
+                    </a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=capacity" ?>" class="side-menu__item <?= (isset($p) && $p == 'capacity' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-bar-chart-box-line me-2"></i>Capacity Planning
+                    </a></li>
+                    <li class="slide side-menu__label1"><a href="javascript:void(0)">Reports</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=reports_health" ?>" class="side-menu__item <?= (isset($p) && $p == 'reports_health' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-heart-pulse-line me-2"></i>Operational Health
+                    </a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=operational&p=reports_executive" ?>" class="side-menu__item <?= (isset($p) && $p == 'reports_executive' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                        <i class="ri-line-chart-line me-2"></i>Executive Dashboard
+                    </a></li>
+                </ul>
+            </li>
+            <!-- End::slide -->
             <li class="slide has-sub">
                 <a href="javascript:void(0);" class="side-menu__item">
                     <i class="ri-calendar-line side-menu__icon"></i>
@@ -315,6 +350,92 @@
                         </a></li>
                         <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=leave&p=audit_log" ?>" class="side-menu__item <?= (isset($p) && $p == 'audit_log' && isset($ss) && $ss == 'leave') ? 'active' : '' ?>">
                             <i class="ri-history-line me-2"></i>Audit Log
+                        </a></li>
+                    </ul>
+                </li>
+                <?php endif; ?>
+                <!-- End::slide -->
+
+                <!-- Start::slide - Operational Work Administration (Admin Section) -->
+                <?php if($isAdmin || $isValidAdmin): ?>
+                <li class="slide has-sub">
+                    <a href="javascript:void(0);" class="side-menu__item">
+                        <i class="ri-settings-4-line side-menu__icon"></i>
+                        <span class="side-menu__label">Operational Work Admin</span>
+                        <i class="ri ri-arrow-right-s-line side-menu__angle"></i>
+                    </a>
+                    <ul class="slide-menu child1">
+                        <!-- Dashboard -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Overview</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=dashboard" ?>" class="side-menu__item <?= (isset($p) && $p == 'dashboard' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                            <i class="ri-dashboard-2-line me-2"></i>Dashboard
+                        </a></li>
+
+                        <!-- Process Management -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Process Management</a></li>
+                        <li class="slide has-sub">
+                            <a href="javascript:void(0);" class="side-menu__item <?= (isset($p) && in_array($p, ['processes', 'activities', 'tasks']) && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                <i class="ri-file-list-3-line me-2"></i>Processes & Activities
+                                <i class="ri ri-arrow-right-s-line side-menu__angle"></i>
+                            </a>
+                            <ul class="slide-menu child2">
+                                <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=processes" ?>" class="side-menu__item <?= (isset($p) && $p == 'processes' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                    <i class="ri-flow-chart-line me-2"></i>Processes
+                                </a></li>
+                                <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=activities" ?>" class="side-menu__item <?= (isset($p) && $p == 'activities' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                    <i class="ri-list-check me-2"></i>Activities
+                                </a></li>
+                                <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=tasks" ?>" class="side-menu__item <?= (isset($p) && $p == 'tasks' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                    <i class="ri-task-line me-2"></i>Tasks
+                                </a></li>
+                            </ul>
+                        </li>
+
+                        <!-- Workflow Management -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Workflow Management</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=workflows" ?>" class="side-menu__item <?= (isset($p) && $p == 'workflows' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                            <i class="ri-flow-chart me-2"></i>Workflows
+                        </a></li>
+
+                        <!-- SOP Management -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">SOP Management</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=sops" ?>" class="side-menu__item <?= (isset($p) && $p == 'sops' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                            <i class="ri-file-text-line me-2"></i>Standard Operating Procedures
+                        </a></li>
+
+                        <!-- Template Management -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Template Management</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=templates" ?>" class="side-menu__item <?= (isset($p) && $p == 'templates' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                            <i class="ri-file-copy-line me-2"></i>Task Templates
+                        </a></li>
+
+                        <!-- Process Optimization -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Process Optimization</a></li>
+                        <li class="slide has-sub">
+                            <a href="javascript:void(0);" class="side-menu__item <?= (isset($p) && in_array($p, ['processes_model', 'processes_simulate', 'processes_optimize']) && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                <i class="ri-line-chart-line me-2"></i>Process Modeling
+                                <i class="ri ri-arrow-right-s-line side-menu__angle"></i>
+                            </a>
+                            <ul class="slide-menu child2">
+                                <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=processes_model" ?>" class="side-menu__item <?= (isset($p) && $p == 'processes_model' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                    <i class="ri-node-tree me-2"></i>Process Modeler
+                                </a></li>
+                                <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=processes_simulate" ?>" class="side-menu__item <?= (isset($p) && $p == 'processes_simulate' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                    <i class="ri-play-circle-line me-2"></i>Simulation
+                                </a></li>
+                                <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=processes_optimize" ?>" class="side-menu__item <?= (isset($p) && $p == 'processes_optimize' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                                    <i class="ri-lightbulb-line me-2"></i>Optimization
+                                </a></li>
+                            </ul>
+                        </li>
+
+                        <!-- Assignments -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Configuration</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=assignments" ?>" class="side-menu__item <?= (isset($p) && $p == 'assignments' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                            <i class="ri-user-settings-line me-2"></i>Task Assignments
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=operational&p=function_heads" ?>" class="side-menu__item <?= (isset($p) && $p == 'function_heads' && isset($ss) && $ss == 'operational') ? 'active' : '' ?>">
+                            <i class="ri-team-line me-2"></i>Function Heads
                         </a></li>
                     </ul>
                 </li>

@@ -294,15 +294,142 @@ class TimeAttendance {
 		LEFT JOIN tija_work_types w ON l.workTypeID = w.workTypeID
 		LEFT JOIN people p ON l.employeeID = p.ID
 		LEFT JOIN tija_activities a ON l.taskActivityID = a.activityID
-		{$where}
+		" . $where . "
 		ORDER BY l.taskDate Desc, l.startTime ASC";
+
 		// echo($query);
-	// var_dump($where);
-	// var_dump($params);
+		// var_dump($where);
+		// var_dump($params);
 
-		$rows = $DBConn->fetch_all_rows($query,$params);
+		$rows = $DBConn->fetch_all_rows($query, $params);
 
-		return($single === true) ? ((is_array($rows) && count($rows)=== 1) ? $rows[0] : false) : ((is_array($rows) && count($rows) > 0) ? $rows : false);
+		return ($single === true) ? ((is_array($rows) && count($rows) === 1) ? $rows[0] : false) : ((is_array($rows) && count($rows) > 0) ? $rows : false);
+	}
+
+	/**
+	 * Log operational time
+	 *
+	 * @param array $data Time log data
+	 * @param object $DBConn Database connection
+	 * @return int|false Time log ID or false
+	 */
+	public static function logOperationalTime($data, $DBConn = null) {
+		if (!$DBConn) {
+			global $DBConn;
+		}
+
+		$cols = array(
+			'taskDate', 'employeeID', 'clientID', 'projectID',
+			'operationalTaskID', 'operationalProjectID', 'processID',
+			'workflowStepID', 'workTypeID', 'taskNarrative', 'startTime',
+			'endTime', 'taskDuration', 'taskDurationSeconds', 'billable',
+			'billableRateValue', 'workHours', 'taskType', 'taskStatusID'
+		);
+
+		$data['taskType'] = 'operational';
+		$data['billable'] = $data['billable'] ?? 'N';
+
+		return $DBConn->insert_db_table_row('tija_tasks_time_logs', $cols, $data);
+	}
+
+	/**
+	 * Get operational time logs
+	 *
+	 * @param array $filters Filter conditions
+	 * @param object $DBConn Database connection
+	 * @return array|false Time logs or false
+	 */
+	public static function getOperationalTimeLogs($filters = [], $DBConn = null) {
+		if (!$DBConn) {
+			global $DBConn;
+		}
+
+		$whereArr = array_merge(['taskType' => 'operational', 'Suspended' => 'N'], $filters);
+		return self::project_tasks_time_logs($whereArr, false, $DBConn);
+	}
+
+	/**
+	 * Get BAU hours by employee
+	 *
+	 * @param int $employeeID Employee ID
+	 * @param string $startDate Start date
+	 * @param string $endDate End date
+	 * @param object $DBConn Database connection
+	 * @return float Total hours
+	 */
+	public static function getBAUHoursByEmployee($employeeID, $startDate, $endDate, $DBConn = null) {
+		if (!$DBConn) {
+			global $DBConn;
+		}
+
+		$whereArr = [
+			'employeeID' => $employeeID,
+			'taskType' => 'operational',
+			'taskDate' => ['BETWEEN', $startDate, $endDate],
+			'Suspended' => 'N'
+		];
+
+		$logs = self::project_tasks_time_logs($whereArr, false, $DBConn);
+
+		$totalHours = 0;
+		if ($logs) {
+			foreach ($logs as $log) {
+				$hours = self::parseHours($log['taskDuration'] ?? $log['workHours'] ?? '0');
+				$totalHours += $hours;
+			}
+		}
+
+		return $totalHours;
+	}
+
+	/**
+	 * Get BAU hours by process
+	 *
+	 * @param string $processID Process ID
+	 * @param string $startDate Start date
+	 * @param string $endDate End date
+	 * @param object $DBConn Database connection
+	 * @return float Total hours
+	 */
+	public static function getBAUHoursByProcess($processID, $startDate, $endDate, $DBConn = null) {
+		if (!$DBConn) {
+			global $DBConn;
+		}
+
+		$whereArr = [
+			'processID' => $processID,
+			'taskType' => 'operational',
+			'taskDate' => ['BETWEEN', $startDate, $endDate],
+			'Suspended' => 'N'
+		];
+
+		$logs = self::project_tasks_time_logs($whereArr, false, $DBConn);
+
+		$totalHours = 0;
+		if ($logs) {
+			foreach ($logs as $log) {
+				$hours = self::parseHours($log['taskDuration'] ?? $log['workHours'] ?? '0');
+				$totalHours += $hours;
+			}
+		}
+
+		return $totalHours;
+	}
+
+	/**
+	 * Parse hours from duration string
+	 *
+	 * @param string $duration Duration string
+	 * @return float Hours
+	 */
+	private static function parseHours($duration) {
+		if (strpos($duration, ':') !== false) {
+			$parts = explode(':', $duration);
+			$hours = (float)$parts[0];
+			$minutes = (float)($parts[1] ?? 0) / 60;
+			return $hours + $minutes;
+		}
+		return (float)$duration;
 	}
 
 

@@ -92,43 +92,6 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
             $result['isApprover'] = true;
             $result['canApprove'] = true;
         }
-
-        function updateFsmStateView(application) {
-            const badgeEl = leaveDetailsContent.querySelector('#fsmStateBadge');
-            const timerEl = leaveDetailsContent.querySelector('#fsmTimerInfo');
-            if (!badgeEl) {
-                return;
-            }
-            badgeEl.innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
-            if (timerEl) {
-                timerEl.textContent = '';
-            }
-
-            const appId = application.leaveApplicationID || application.id;
-            const url = `${baseUrl}php/scripts/leave/handovers/get_fsm_state.php?leaveApplicationID=${encodeURIComponent(appId)}`;
-            fetch(url, { credentials: 'same-origin' })
-                .then(response => response.json())
-                .then(result => {
-                    if (!result.success || !result.state) {
-                        throw new Error(result.message || 'Unable to load workflow state');
-                    }
-                    const state = result.state;
-                    badgeEl.textContent = state.currentStateName || state.currentState || 'Unknown';
-                    badgeEl.className = 'badge bg-light text-dark text-uppercase';
-                    if (timerEl && state.timerInfo) {
-                        timerEl.textContent = state.timerInfo.expired
-                            ? 'Response timer expired'
-                            : `Response due in ${state.timerInfo.remaining_hours ? Number(state.timerInfo.remaining_hours).toFixed(1) + 'h' : ''}`;
-                    }
-                })
-                .catch(() => {
-                    badgeEl.className = 'badge bg-danger text-uppercase';
-                    badgeEl.textContent = 'Unavailable';
-                    if (timerEl) {
-                        timerEl.textContent = '';
-                    }
-                });
-        }
         return $result;
     }
 
@@ -1043,6 +1006,43 @@ function formatDateRange($start, $end)
             if (!leaveDetailsError) return;
             leaveDetailsError.textContent = message;
             leaveDetailsError.classList.remove('d-none');
+        }
+
+        function updateFsmStateView(application) {
+            const badgeEl = leaveDetailsContent.querySelector('#fsmStateBadge');
+            const timerEl = leaveDetailsContent.querySelector('#fsmTimerInfo');
+            if (!badgeEl) {
+                return;
+            }
+            badgeEl.innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
+            if (timerEl) {
+                timerEl.textContent = '';
+            }
+
+            const appId = application.leaveApplicationID || application.id;
+            const url = `${baseUrl}php/scripts/leave/handovers/get_fsm_state.php?leaveApplicationID=${encodeURIComponent(appId)}`;
+            fetch(url, { credentials: 'same-origin' })
+                .then(response => response.json())
+                .then(result => {
+                    if (!result.success || !result.state) {
+                        throw new Error(result.message || 'Unable to load workflow state');
+                    }
+                    const state = result.state;
+                    badgeEl.textContent = state.currentStateName || state.currentState || 'Unknown';
+                    badgeEl.className = 'badge bg-light text-dark text-uppercase';
+                    if (timerEl && state.timerInfo) {
+                        timerEl.textContent = state.timerInfo.expired
+                            ? 'Response timer expired'
+                            : `Response due in ${state.timerInfo.remaining_hours ? Number(state.timerInfo.remaining_hours).toFixed(1) + 'h' : ''}`;
+                    }
+                })
+                .catch(() => {
+                    badgeEl.className = 'badge bg-danger text-uppercase';
+                    badgeEl.textContent = 'Unavailable';
+                    if (timerEl) {
+                        timerEl.textContent = '';
+                    }
+                });
         }
 
         function renderLeaveDetails(payload) {

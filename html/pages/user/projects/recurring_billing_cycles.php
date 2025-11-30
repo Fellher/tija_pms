@@ -39,7 +39,7 @@ $billingCycles = Projects::get_billing_cycles(['projectID' => $projectID, 'Suspe
 $client = Clients::clients(['clientID' => $project->clientID], true, $DBConn);
 
 $pageTitle = "Billing Cycles - {$project->projectName}";
-include 'html/includes/header.php';
+// Header is automatically included in index.php
 ?>
 
 <div class="main-content">
@@ -297,5 +297,5 @@ function generateNextCycles(projectID, projectName) {
 }
 </script>
 
-<?php include 'html/includes/footer.php'; ?>
+<?php // Footer is automatically included in index.php ?>
 
