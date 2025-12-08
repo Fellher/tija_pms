@@ -204,9 +204,8 @@ try {
 
     $DBConn->commit();
 
-    // Build redirect URL
-    $webBase = '/pms_skim.co.ke_rev/';  // Adjust if needed
-    $redirectUrl = "{$webBase}html/?s=user&ss=sales&p=home_refactored&state=business_development";
+    // Build redirect URL (relative path - JavaScript will prepend base)
+    $redirectUrl = "?s=user&ss=sales&p=home&state=business_development";
 
     $response['success'] = true;
     $response['message'] = $message;

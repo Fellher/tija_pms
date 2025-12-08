@@ -51,10 +51,21 @@ $employeesCategorised = Employee::categorise_employee($allEmployees, 'jobTitle')
       <div class="wizard-step active" data-step="1">
          <h5 class="mb-4"><i class="ri-file-text-line me-2"></i>Basic Proposal Information</h5>
 
-         <input type="hidden" name="orgDataID" value="<?= $orgDataID ?? '' ?>">
-         <input type="hidden" name="entityID" value="<?= $entityID ?? '' ?>">
-         <input type="hidden" name="employeeID" value="<?= $userDetails->ID ?? '' ?>">
+         <input type="hidden" name="orgDataID" id="wizardOrgDataID" value="<?= $orgDataID ?? '' ?>">
+         <input type="hidden" name="entityID" id="wizardEntityID" value="<?= $entityID ?? '' ?>">
+         <input type="hidden" name="employeeID" id="wizardEmployeeID" value="<?= $userDetails->ID ?? '' ?>">
          <input type="hidden" name="proposalID" id="wizardProposalID" value="">
+
+         <?php if (defined('DEBUG_MODE') && DEBUG_MODE): ?>
+         <!-- Debug info - remove after testing -->
+         <div class="alert alert-info small">
+            <strong>Debug Info:</strong><br>
+            orgDataID: <?= $orgDataID ?? 'NOT SET' ?><br>
+            entityID: <?= $entityID ?? 'NOT SET' ?><br>
+            employeeID: <?= $userDetails->ID ?? 'NOT SET' ?><br>
+            Employee Name: <?= $userDetails->employeeName ?? 'NOT SET' ?>
+         </div>
+         <?php endif; ?>
 
          <div class="row g-3">
             <div class="col-md-12">
@@ -747,7 +758,20 @@ $employeesCategorised = Employee::categorise_employee($allEmployees, 'jobTitle')
    function saveStepData(step) {
       switch(step) {
          case 1:
+            // Get hidden field values
+            const orgDataID = document.getElementById('wizardOrgDataID')?.value || '';
+            const entityID = document.getElementById('wizardEntityID')?.value || '';
+            const employeeID = document.getElementById('wizardEmployeeID')?.value || '';
+            const proposalID = document.getElementById('wizardProposalID')?.value || '';
+
+            // Debug: Log the values to console
+            console.log('Wizard Data - orgDataID:', orgDataID, 'entityID:', entityID, 'employeeID:', employeeID);
+
             wizardData.proposal = {
+               orgDataID: orgDataID,
+               entityID: entityID,
+               employeeID: employeeID,
+               proposalID: proposalID,
                proposalTitle: document.getElementById('wizardProposalTitle').value,
                clientID: document.getElementById('wizardClientID').value,
                salesCaseID: document.getElementById('wizardSalesCaseID').value,
@@ -1294,9 +1318,13 @@ $employeesCategorised = Employee::categorise_employee($allEmployees, 'jobTitle')
    function saveDraft() {
       saveStepData(currentStep);
 
+      // Debug: Log what we're about to send
+      console.log('Saving draft with data:', wizardData.proposal);
+
       const formData = new FormData();
       Object.keys(wizardData.proposal).forEach(key => {
          formData.append(key, wizardData.proposal[key]);
+         console.log(`FormData: ${key} = ${wizardData.proposal[key]}`);
       });
       formData.append('action', 'create');
       formData.append('ajax', '1'); // Flag as AJAX request
@@ -1334,6 +1362,17 @@ $employeesCategorised = Employee::categorise_employee($allEmployees, 'jobTitle')
             if (data.data && data.data.proposalID) {
                document.getElementById('wizardProposalID').value = data.data.proposalID;
             }
+
+            // Close modal after successful save
+            const modal = bootstrap.Modal.getInstance(wizardModal);
+            if (modal) {
+               modal.hide();
+            }
+
+            // Optionally reload page to show the new draft
+            setTimeout(() => {
+               location.reload();
+            }, 1000);
          } else {
             const errorMsg = (data && data.message) ? data.message : 'Failed to save draft';
             if (typeof showToast === 'function') {

@@ -671,6 +671,43 @@ class Data {
     }
 
     /**
+     * Get job categories
+     * @param array $whereArr - WHERE conditions
+     * @param bool $single - Return single record or multiple
+     * @param object $DBConn - Database connection
+     * @return mixed - Array of records or single record or false
+     */
+    public static function job_categories($whereArr, $single, $DBConn) {
+        // Use actual column names from schema (jobCategoryTitle, not jobCategoryName)
+        $cols = array('jobCategoryID', 'DateAdded', 'jobCategoryTitle', 'jobCategoryDescription', 'LastUpdatedByID', 'LastUpdated', 'Lapsed', 'Suspended');
+        $rows = $DBConn->retrieve_db_table_rows('tija_job_categories', $cols, $whereArr);
+
+        if (!$rows) {
+            return false;
+        }
+
+        // Normalise to array for post-processing
+        $list = ($single === true && !is_array($rows)) ? array($rows) : $rows;
+
+        foreach ($list as &$row) {
+            // Ensure we can access as object
+            if (is_array($row)) {
+                $row = (object) $row;
+            }
+            // Provide jobCategoryName alias for compatibility
+            if (!isset($row->jobCategoryName) && isset($row->jobCategoryTitle)) {
+                $row->jobCategoryName = $row->jobCategoryTitle;
+            }
+        }
+
+        if ($single === true) {
+            return (count($list) === 1) ? $list[0] : false;
+        }
+
+        return $list;
+    }
+
+    /**
      * Get departments from tija_units where unitTypeID = 1 (Department type)
      * Returns units as departments with departmentID, departmentName, and departmentDescription
      * @param array $whereArr - WHERE conditions (e.g., ['entityID' => 1, 'Suspended' => 'N'])

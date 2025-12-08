@@ -151,6 +151,12 @@ $config['weekhour_sat'] = 3600*5;
 /**
  * Site configuration Core Setings
  * **********************************/
+//check if localhost, if so, use the offline root
+if (preg_match('/localhost/', $_SERVER['HTTP_HOST'])) {
+	$config['siteRoot'] ='sbsl.tija.sbsl.co.ke';
+} else {
+	$config['siteRoot'] ='pms.sbsl.co.ke';
+}
 $config['siteRoot'] ='sbsl.tija.sbsl.co.ke';
 $config['siteName'] = "Tija Practice Management System";
 $base_url = ( isset($_SERVER['HTTPS']) && $_SERVER['HTTPS']=='on' ? 'https' : 'http' ) . '://' .  $_SERVER['HTTP_HOST'];
@@ -173,10 +179,17 @@ $config['selectionsNo'] = 3;
 RECAPTCHA Configurations
 =======================================*/
 
+//check if localhost, if so, use the offline keys
+if (preg_match('/localhost/', $_SERVER['HTTP_HOST'])) {
+	$config['siteKey'] ="6LdbKeAUAAAAAOjo-17n853r38Uk-B9JzrQOHTRb";
+	$config['secretKey'] ="6LdbKeAUAAAAAC1a3HyWOjMsIsqYIcX3UwS41QiJ";
+} else {
+// online
+	$config['siteKey'] ='6LcjITsaAAAAAE0vQ2I83eRl7nYtQyxCQsHa-IkX';
+	$config['secretKey']='6LcjITsaAAAAAIMxKHbe53PtIzO8BJrReweMLw-j';
+}
 
-//offline Live Projects
-$config['siteKey'] ="6LdbKeAUAAAAAOjo-17n853r38Uk-B9JzrQOHTRb";
-$config['secretKey'] ="6LdbKeAUAAAAAC1a3HyWOjMsIsqYIcX3UwS41QiJ";
+
 
 
 /**

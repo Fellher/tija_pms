@@ -67,6 +67,10 @@ if ($state === 'clients_directory') {
     }
 }
 
+$sectors = Data::tija_sectors([], false, $DBConn);
+$industries = Data::tija_industry([], false, $DBConn);
+
+
 // Map display name 'won' to actual stage 'order' for backwards compatibility
 if ($state === 'won') {
     $state = 'order';
@@ -79,6 +83,10 @@ $getString .= "&orgDataID={$orgDataID}&entityID={$entityID}&state={$state}&view=
 // Use the existing $base variable which works for both local and online
 $jsBasePath = $base;
 ?>
+<script>
+    window.sectors = <?= json_encode($sectors ?: []) ?>;
+    window.industries = <?= json_encode($industries ?: []) ?>;
+</script>
 
 <!-- Sales Dashboard Header -->
 <div class="d-md-flex d-block align-items-center justify-content-between my-4 page-header-breadcrumb">
@@ -179,31 +187,32 @@ $jsBasePath = $base;
                 </ul>
             </div>
             <div class="col-md-4 text-end">
-                <?php if ($state !== 'clients_directory'): ?>
-                <div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check" name="viewType" id="viewKanban" autocomplete="off"
-                           <?= $view === 'kanban' ? 'checked' : '' ?>>
-                    <label class="btn btn-outline-primary" for="viewKanban" data-view="kanban">
-                        <i class="ri-layout-grid-line"></i> Kanban
-                    </label>
+                <?php
+                if ($state !== 'clients_directory'): ?>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <input type="radio" class="btn-check" name="viewType" id="viewKanban" autocomplete="off"
+                            <?= $view === 'kanban' ? 'checked' : '' ?>>
+                        <label class="btn btn-outline-primary" for="viewKanban" data-view="kanban">
+                            <i class="ri-layout-grid-line"></i> Kanban
+                        </label>
 
-                    <input type="radio" class="btn-check" name="viewType" id="viewList" autocomplete="off"
-                           <?= $view === 'list' ? 'checked' : '' ?>>
-                    <label class="btn btn-outline-primary" for="viewList" data-view="list">
-                        <i class="ri-list-check"></i> List
-                    </label>
-                </div>
+                        <input type="radio" class="btn-check" name="viewType" id="viewList" autocomplete="off"
+                            <?= $view === 'list' ? 'checked' : '' ?>>
+                        <label class="btn btn-outline-primary" for="viewList" data-view="list">
+                            <i class="ri-list-check"></i> List
+                        </label>
+                    </div>
 
-                <div class="btn-group btn-group-sm ms-2" role="group">
-                    <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                        <i class="ri-filter-line"></i>
-                        <?= $filter === 'my' ? 'My Sales' : 'All Sales' ?>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="<?= "{$base}html/?s={$s}&ss={$ss}&p={$p}&state={$state}&view={$view}&filter=all" ?>">All Sales</a></li>
-                        <li><a class="dropdown-item" href="<?= "{$base}html/?s={$s}&ss={$ss}&p={$p}&state={$state}&view={$view}&filter=my" ?>">My Sales</a></li>
-                    </ul>
-                </div>
+                    <div class="btn-group btn-group-sm ms-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="ri-filter-line"></i>
+                            <?= $filter === 'my' ? 'My Sales' : 'All Sales' ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="<?= "{$base}html/?s={$s}&ss={$ss}&p={$p}&state={$state}&view={$view}&filter=all" ?>">All Sales</a></li>
+                            <li><a class="dropdown-item" href="<?= "{$base}html/?s={$s}&ss={$ss}&p={$p}&state={$state}&view={$view}&filter=my" ?>">My Sales</a></li>
+                        </ul>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -360,7 +369,13 @@ $jsBasePath = $base;
 if (!isset($clientContacts)) {
     $clientContacts = [];
 }
-echo Utility::form_modal_header("quickAddModal", "sales/manage_sale.php", "Quick Add Sale", array('modal-lg', 'modal-dialog-centered'), $base);
+
+// Ensure countries list is available for the Quick Add (new client) form
+if (!isset($countries) || !is_array($countries) || empty($countries)) {
+    $countries = Data::countries([], false, $DBConn);
+}
+
+echo Utility::form_modal_header("quickAddModal", "sales/manage_sale.php", "Quick Add Sale", array('modal-xl', 'modal-dialog-centered'), $base);
 include "includes/scripts/sales/modals/manage_sale_enhanced.php";
 echo Utility::form_modal_footer('Save', 'saveSale', 'btn btn-primary', true);
 
@@ -403,24 +418,42 @@ echo Utility::form_modal_header("progressBusinessDevModal", "sales/progress_busi
             </div>
             <?php
             if ($opportunityStatusLevels) {
-                $i = 0;
+                $displayedCount = 0;
                 foreach ($opportunityStatusLevels as $opKey => $statusLevel) {
-                    $i++;
-                    if ($i > 2) continue; // Show first 2 status levels
+                    // Filter status levels: probability must be between 10% and 50% (inclusive)
+                    $probability = isset($statusLevel->levelPercentage) ? (float)$statusLevel->levelPercentage : 0;
+
+                    if ($probability >= 10 && $probability <= 50) {
+                        $displayedCount++;
+                        ?>
+                        <div class="col-sm-12 col-lg-6 mb-2">
+                            <input class="btn-check" type="radio" name="saleStatusLevelID"
+                                id="progressStatusLevel<?= $opKey ?>"
+                                value="<?= $statusLevel->saleStatusLevelID ?>"
+                                data-probability="<?= $statusLevel->levelPercentage ?>"
+                                <?= $displayedCount === 1 ? 'required' : '' ?>>
+                            <label class="form-check-label btn btn-outline-primary w-100 text-start"
+                                for="progressStatusLevel<?= $opKey ?>">
+                                <h6 class="mb-1"><?= $statusLevel->statusLevel ?></h6>
+                                <small class="text-muted"><?= $statusLevel->StatusLevelDescription ?></small>
+                                <div class="mt-1">
+                                    <span class="badge bg-primary-transparent"><?= $statusLevel->levelPercentage ?>% probability</span>
+                                </div>
+                            </label>
+                        </div>
+                        <?php
+                    }
+                }
+
+                // Show message if no status levels found in the range
+                if ($displayedCount === 0) {
                     ?>
-                    <div class="col-sm-12 col-lg-6 mb-2">
-                        <input class="btn-check" type="radio" name="saleStatusLevelID"
-                            id="progressStatusLevel<?= $opKey ?>"
-                            value="<?= $statusLevel->saleStatusLevelID ?>"
-                            data-probability="<?= $statusLevel->levelPercentage ?>" required>
-                        <label class="form-check-label btn btn-outline-primary w-100 text-start"
-                            for="progressStatusLevel<?= $opKey ?>">
-                            <h6 class="mb-1"><?= $statusLevel->statusLevel ?></h6>
-                            <small class="text-muted"><?= $statusLevel->StatusLevelDescription ?></small>
-                            <div class="mt-1">
-                                <span class="badge bg-primary-transparent"><?= $statusLevel->levelPercentage ?>% probability</span>
-                            </div>
-                        </label>
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <i class="ri-alert-line me-2"></i>
+                            No opportunity status levels found with probability between 10% and 50%.
+                            Please contact your administrator to configure appropriate status levels.
+                        </div>
                     </div>
                     <?php
                 }
@@ -1601,8 +1634,17 @@ const SalesDashboard = {
         document.getElementById('salesContent').innerHTML = emptyHTML;
 
         document.getElementById('emptyStateAddBtn')?.addEventListener('click', () => {
-            const modal = new bootstrap.Modal(document.getElementById('quickAddModal'));
-            modal.show();
+            // For Business Development, open the Add Business Development (prospect) modal.
+            // For other stages (e.g. Opportunities), open the Quick Add (opportunity) modal.
+            const targetModalId = this.config.currentState === 'business_development'
+                ? 'addBusinessDevModal'
+                : 'quickAddModal';
+
+            const modalElement = document.getElementById(targetModalId);
+            if (modalElement && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            }
         });
     },
 
@@ -1645,7 +1687,14 @@ const SalesDashboard = {
                 if (this.config.currentState !== 'opportunities' && view === 'kanban') {
                     return; // Don't navigate
                 }
-                window.location.href = `${this.config.base}html/?s=user&ss=sales&p=home_refactored&state=${this.config.currentState}&view=${view}&filter=${this.config.currentFilter}`;
+
+                // Stay on the current page (`p=<?= $p ?>`) instead of hard-coding an unknown page
+                window.location.href =
+                    this.config.base +
+                    'html/?s=<?= $s ?>&ss=<?= $ss ?>&p=<?= $p ?>' +
+                    '&state=' + this.config.currentState +
+                    '&view=' + view +
+                    '&filter=' + this.config.currentFilter;
             });
         });
     },
@@ -2009,7 +2058,11 @@ const SalesDashboard = {
         document.getElementById('bdClientID').value = '';
         document.getElementById('bdClientContactID').value = '';
         document.getElementById('bdBusinessUnitID').value = '';
-        document.getElementById('bdSalesPersonID').value = '';
+        // Pre-fill Prospect Owner with current logged-in user
+        const bdSalesPersonID = document.getElementById('bdSalesPersonID');
+        if (bdSalesPersonID && this.config.userID) {
+            bdSalesPersonID.value = this.config.userID;
+        }
         document.getElementById('bdExpectedRevenue').value = '';
 
         // Hide new client/contact/unit sections
@@ -2261,7 +2314,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.location.href = data.data.redirectUrl;
                         } else {
                             // Fallback: go to opportunities tab
-                            window.location.href = '<?= $base ?>html/?s=<?= $s ?>&ss=<?= $ss ?>&p=home_refactored&state=opportunities';
+                            window.location.href = '<?= $base ?>html/?s=<?= $s ?>&ss=<?= $ss ?>&p=home&state=opportunities';
                         }
                     }, 1000);
                 } else {
@@ -2512,7 +2565,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Reload page to show new prospect
                 setTimeout(() => {
                     if (data.data && data.data.redirectUrl) {
-                        window.location.href = data.data.redirectUrl;
+                        // Construct full URL using base path
+                        const redirectUrl = data.data.redirectUrl.startsWith('?')
+                            ? `${SalesDashboard.config.base}html/${data.data.redirectUrl}`
+                            : data.data.redirectUrl;
+                        window.location.href = redirectUrl;
                     } else {
                         window.location.reload();
                     }

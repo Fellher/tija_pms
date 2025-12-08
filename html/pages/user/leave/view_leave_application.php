@@ -381,16 +381,28 @@ function renderApprovalStatus($statusID) {
 
 .approver-comment {
     margin-top: 0.5rem;
-    padding-top: 0.5rem;
+    padding: 0.75rem;
     border-top: 1px solid #dee2e6;
     font-size: 0.875rem;
     color: #495057;
+    border-radius: 0.25rem;
+}
+
+.approver-comment.bg-white {
+    padding: 1rem;
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    margin-bottom: -0.75rem;
 }
 
 .approver-comment-date {
     font-size: 0.75rem;
     color: #6c757d;
     margin-top: 0.25rem;
+}
+
+.approver-item.border-danger {
+    border-width: 2px !important;
 }
 
 .workflow-progress {
@@ -524,13 +536,68 @@ function renderApprovalStatus($statusID) {
             </div>
         `;
 
-        // Overall status
+        // Overall status with rejection details
         if (workflow.hasRejection) {
-            html += '<div class="alert alert-danger mb-3"><i class="ri-close-circle-line me-2"></i>Application has been rejected.</div>';
+            html += '<div class="alert alert-danger mb-3">';
+            html += '<h6 class="alert-heading mb-2"><i class="ri-close-circle-line me-2"></i>Application Rejected</h6>';
+            html += '<p class="mb-2">Your leave application has been rejected. Please review the comments below to understand the reason and take necessary action.</p>';
+
+            // Show who rejected
+            const rejectedApprovers = [];
+            steps.forEach(step => {
+                if (step.approvers) {
+                    step.approvers.forEach(approver => {
+                        if (approver.hasActed && approver.action === 'rejected') {
+                            const comment = approver.comments || '';
+                            const displayDate = approver.actionDate || approver.decisionDate || null;
+                            const matchingComment = comments.find(c =>
+                                c.approverUserID == approver.approverUserID ||
+                                c.approverID == approver.approverUserID
+                            );
+                            const displayComment = comment || (matchingComment ? matchingComment.comment : '');
+
+                            rejectedApprovers.push({
+                                name: approver.approverName || 'Unknown',
+                                comment: displayComment,
+                                date: displayDate || (matchingComment ? matchingComment.commentDate : null)
+                            });
+                        }
+                    });
+                }
+            });
+
+            if (rejectedApprovers.length > 0) {
+                html += '<hr class="my-2">';
+                html += '<strong>Rejected by:</strong>';
+                html += '<ul class="mb-0 mt-2">';
+                rejectedApprovers.forEach(approver => {
+                    html += '<li class="mb-2">';
+                    html += '<strong>' + escapeHtml(approver.name) + '</strong>';
+                    if (approver.date) {
+                        html += ' <small class="text-muted">(' + formatDateTime(approver.date) + ')</small>';
+                    }
+                    if (approver.comment) {
+                        html += '<br><em>"' + escapeHtmlMultiline(approver.comment) + '"</em>';
+                    }
+                    html += '</li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div>';
         } else if (workflow.allRequiredApproved && workflow.isFinalStepComplete) {
-            html += '<div class="alert alert-success mb-3"><i class="ri-checkbox-circle-line me-2"></i>All approvals completed.</div>';
+            html += '<div class="alert alert-success mb-3">';
+            html += '<h6 class="alert-heading mb-2"><i class="ri-checkbox-circle-line me-2"></i>Fully Approved</h6>';
+            html += '<p class="mb-0">All required approvals have been completed. Your leave application is now approved.</p>';
+            html += '</div>';
         } else {
-            html += '<div class="alert alert-info mb-3"><i class="ri-time-line me-2"></i>Waiting for approvals...</div>';
+            // Show partial approvals
+            const approvedCount = steps.reduce((sum, s) => sum + (s.approvedCount || 0), 0);
+            const totalApprovers = steps.reduce((sum, s) => sum + (s.totalApprovers || 0), 0);
+
+            html += '<div class="alert alert-info mb-3">';
+            html += '<h6 class="alert-heading mb-2"><i class="ri-time-line me-2"></i>Approval In Progress</h6>';
+            html += `<p class="mb-0">Progress: ${approvedCount} of ${totalApprovers} approver(s) have approved. Waiting for remaining approvals...</p>`;
+            html += '</div>';
         }
 
         // Workflow steps
@@ -562,7 +629,7 @@ function renderApprovalStatus($statusID) {
                         const hasActed = approver.hasActed || false;
                         const action = approver.action || null;
                         const approverComments = approver.comments || '';
-                        const decisionDate = approver.decisionDate || null;
+                        const actionDate = approver.actionDate || approver.decisionDate || null; // Support both field names
 
                         // Find matching comment from comments array
                         const matchingComment = comments.find(c =>
@@ -571,10 +638,14 @@ function renderApprovalStatus($statusID) {
                         );
 
                         const displayComment = approverComments || (matchingComment ? matchingComment.comment : '');
-                        const displayDate = decisionDate || (matchingComment ? matchingComment.commentDate : null);
+                        const displayDate = actionDate || (matchingComment ? matchingComment.commentDate : null);
+
+                        const isRejected = hasActed && action === 'rejected';
+                        const isApproved = hasActed && action === 'approved';
+                        const itemClass = isRejected ? 'border-danger bg-danger bg-opacity-10' : '';
 
                         html += `
-                            <div class="approver-item">
+                            <div class="approver-item ${itemClass}">
                                 <div class="approver-info">
                                     <div class="approver-name">
                                         ${escapeHtml(approver.approverName || 'Unknown Approver')}
@@ -584,8 +655,8 @@ function renderApprovalStatus($statusID) {
                                 </div>
                                 <div class="approver-action">
                                     ${hasActed ?
-                                        `<span class="badge approver-action-badge ${action === 'approved' ? 'bg-success' : 'bg-danger'}">
-                                            ${action === 'approved' ? '<i class="ri-check-line"></i> Approved' : '<i class="ri-close-line"></i> Rejected'}
+                                        `<span class="badge approver-action-badge ${isApproved ? 'bg-success' : 'bg-danger'}">
+                                            ${isApproved ? '<i class="ri-check-line"></i> Approved' : '<i class="ri-close-line"></i> Rejected'}
                                         </span>` :
                                         `<span class="badge approver-action-badge bg-warning text-dark">
                                             <i class="ri-time-line"></i> Pending
@@ -595,10 +666,12 @@ function renderApprovalStatus($statusID) {
                             </div>
                         `;
 
-                        if (hasActed && displayComment) {
+                        if (hasActed && (displayComment || displayDate)) {
+                            const commentClass = isRejected ? 'bg-white border border-danger' : '';
                             html += `
-                                <div class="approver-comment">
-                                    <strong>Comment:</strong> ${escapeHtmlMultiline(displayComment)}
+                                <div class="approver-comment ${commentClass}">
+                                    ${isRejected ? '<div class="text-danger fw-bold mb-1"><i class="ri-alert-line me-1"></i>Rejection Reason:</div>' : ''}
+                                    ${displayComment ? '<div class="mb-1">' + escapeHtmlMultiline(displayComment) + '</div>' : ''}
                                     ${displayDate ? '<div class="approver-comment-date"><i class="ri-time-line me-1"></i>' + formatDateTime(displayDate) + '</div>' : ''}
                                 </div>
                             `;

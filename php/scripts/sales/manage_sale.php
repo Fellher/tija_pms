@@ -13,13 +13,12 @@ $details=array();
 $changes= array();
 $success="";
 if ($isValidUser) {
-	var_dump($_POST);   
    $salesCaseID = (isset($_POST['salesCaseID']) && !empty($_POST['salesCaseID'])) ?  Utility::clean_string($_POST['salesCaseID']): "";
    $orgDataID = (isset($_POST['orgDataID']) && !empty($_POST['orgDataID'])) ?  Utility::clean_string($_POST['orgDataID']): "";
    $entityID = (isset($_POST['entityID']) && !empty($_POST['entityID'])) ?  Utility::clean_string($_POST['entityID']): "";
    $salesStage = (isset($_POST['salesStage']) && !empty($_POST['salesStage'])) ?  Utility::clean_string($_POST['salesStage']): "opportunities";
    $salesPersonID = (isset($_POST['salesPersonID']) && !empty($_POST['salesPersonID'])) ?  Utility::clean_string($_POST['salesPersonID']): "";
-   $salesCaseContactID = (isset($_POST['salesCaseContactID']) && !empty($_POST['salesCaseContactID'])) ?  Utility::clean_string($_POST['salesCaseContactID']): "";  
+   $salesCaseContactID = (isset($_POST['salesCaseContactID']) && !empty($_POST['salesCaseContactID'])) ?  Utility::clean_string($_POST['salesCaseContactID']): "";
    $newClientNote = (isset($_POST['newClientNote']) && !empty($_POST['newClientNote'])) ?  Utility::clean_string($_POST['newClientNote']): "";
    if(!$newClientNote){
       $clientID = (isset($_POST['clientID']) && !empty($_POST['clientID'])) ?  Utility::clean_string($_POST['clientID']): "";
@@ -30,7 +29,7 @@ if ($isValidUser) {
       $clientCode = (isset($_POST['clientCode']) && !empty($_POST['clientCode'])) ?  Utility::clean_string($_POST['clientCode']):($clientName ?  Utility::clientCode($clientName) : null);
       $countryID = (isset($_POST['countryID']) && !empty($_POST['countryID'])) ?  Utility::clean_string($_POST['countryID']): "";
       $city = (isset($_POST['city']) && !empty($_POST['city'])) ?  Utility::clean_string($_POST['city']): "";
-      $newClientArray = array(        
+      $newClientArray = array(
          'orgDataID'=>$orgDataID,
          'entityID'=>$entityID,
          'LastUpdateByID'=>$userDetails->ID,
@@ -46,43 +45,41 @@ if ($isValidUser) {
       $newClientArray['accountOwnerID'] = $salesPersonID ?   $salesPersonID : $userDetails->ID;
 
 
-      // Client Address Details
+      // Client Address Details (optional for Quick Add)
       $addressType = (isset($_POST['addressType']) && !empty($_POST['addressType'])) ?  Utility::clean_string($_POST['addressType']): "";
       $billingAddress = (isset($_POST['billingAddress']) && !empty($_POST['billingAddress'])) ?  Utility::clean_string($_POST['billingAddress']): "";
-
       $headquarters = (isset($_POST['headquarters']) && !empty($_POST['headquarters'])) ?  Utility::clean_string($_POST['headquarters']): "";
       $postalCode = (isset($_POST['postalCode']) && !empty($_POST['postalCode'])) ?  Utility::clean_string($_POST['postalCode']): "";
       $address = (isset($_POST['address']) && !empty($_POST['address'])) ?  Utility::clean_string($_POST['address']): "";
-      
 
       if(!$errors) {
          if($newClientArray) {
-            var_dump($newClientArray);
             $newClientArray['LastUpdateByID'] = $userDetails->ID;
             if(!$DBConn->insert_data('tija_clients', $newClientArray)) {
                $errors[] = 'Error adding new Client';
             } else {
                $clientID = $DBConn->lastInsertID();
                $success = 'New Client added successfully';
-               // Add the client Address 
-               $clientAddressArray=array();
-               $clientID ? $clientAddressArray['clientID'] = $clientID : $errors[] = 'Client ID is required';
-               $addressType ? $clientAddressArray['addressType'] = $addressType : $errors[] = 'Address Type is required';
-               $billingAddress ? $clientAddressArray['billingAddress'] = $billingAddress : "";
-               $headquarters ? $clientAddressArray['headquarters'] = $headquarters : "";
-               $postalCode ? $clientAddressArray['postalCode'] = $postalCode : "";
-               $countryID ? $clientAddressArray['countryID'] = $countryID : "";
-               $city ? $clientAddressArray['city'] = $city : "";
-               $address ? $clientAddressArray['address'] = $address : $errors[] = 'Address is required';
-               $orgDataID ? $clientAddressArray['orgDataID'] = $orgDataID : $errors[] = 'Organization Data is required';
-               $entityID ? $clientAddressArray['entityID'] = $entityID : $errors[] = 'Entity is required';
-               if(!$errors) {
-                  if($clientAddressArray) {
+
+               // Optionally add the client Address if any address-related fields were provided
+               if ($addressType || $billingAddress || $headquarters || $postalCode || $countryID || $city || $address) {
+                  $clientAddressArray = array();
+                  $clientAddressArray['clientID'] = $clientID;
+                  if ($addressType)     $clientAddressArray['addressType']   = $addressType;
+                  if ($billingAddress)  $clientAddressArray['billingAddress'] = $billingAddress;
+                  if ($headquarters)    $clientAddressArray['headquarters']   = $headquarters;
+                  if ($postalCode)      $clientAddressArray['postalCode']     = $postalCode;
+                  if ($countryID)       $clientAddressArray['countryID']      = $countryID;
+                  if ($city)            $clientAddressArray['city']           = $city;
+                  if ($address)         $clientAddressArray['address']        = $address;
+                  if ($orgDataID)       $clientAddressArray['orgDataID']      = $orgDataID;
+                  if ($entityID)        $clientAddressArray['entityID']       = $entityID;
+
+                  if(!$errors && $clientAddressArray) {
                      $clientAddressArray['LastUpdateByID'] = $userDetails->ID;
                      $clientAddressArray['DateAdded'] = $config['currentDateTimeFormated'];
                      $clientAddressArray['LastUpdate'] = $config['currentDateTimeFormated'];
                      if(!$DBConn->insert_data('tija_client_addresses', $clientAddressArray)) {
-                       
                         $errors[] = 'Error adding new Client Address';
                      } else {
                         $clientAddressID = $DBConn->lastInsertID();
@@ -108,7 +105,7 @@ if ($isValidUser) {
       if(!$contactTitle) {
          $errors[] = 'Contact Title is required';
       }
-      $salesContactArray = array(        
+      $salesContactArray = array(
          'contactName'=>$contactName,
          'title'=>$contactTitle,
          'salutationID'=>$salutationID? $salutationID : null,
@@ -135,12 +132,12 @@ if ($isValidUser) {
             }
          }
       }
-   }  
+   }
 
    $deleteSalesCase = (isset($_POST['deleteSalesCase']) && !empty($_POST['deleteSalesCase'])) ?  Utility::clean_string($_POST['deleteSalesCase']): "";
-   $suspended =($deleteSalesCase && $deleteSalesCase == '1') ? 'Y' : 'N';    
-   $salesCaseName = (isset($_POST['salesCaseName']) && !empty($_POST['salesCaseName'])) ?  Utility::clean_string($_POST['salesCaseName']): ""; 
-   $saleStage = (isset($_POST['saleStage']) && !empty($_POST['saleStage'])) ?  Utility::clean_string($_POST['saleStage']): "opportunity";    
+   $suspended =($deleteSalesCase && $deleteSalesCase == '1') ? 'Y' : 'N';
+   $salesCaseName = (isset($_POST['salesCaseName']) && !empty($_POST['salesCaseName'])) ?  Utility::clean_string($_POST['salesCaseName']): "";
+   $saleStage = (isset($_POST['saleStage']) && !empty($_POST['saleStage'])) ?  Utility::clean_string($_POST['saleStage']): "opportunity";
    $probability = (isset($_POST['probability']) && !empty($_POST['probability'])) ?  Utility::clean_string($_POST['probability']): "";
    $saleStatusLevelID = (isset($_POST['saleStatusLevelID']) && !empty($_POST['saleStatusLevelID'])) ?  Utility::clean_string($_POST['saleStatusLevelID']): "";
    $closeStatus = (isset($_POST['closeStatus']) && !empty($_POST['closeStatus'])) ?  Utility::clean_string($_POST['closeStatus']): "open";
@@ -150,10 +147,8 @@ if ($isValidUser) {
       $dateClosed = $config['currentDate'];
    } else {
       $dateClosed = '';
-   }  
+   }
 
-   var_dump($closeStatus);
-   var_dump($suspended);
    $businessUnitID = (isset($_POST['businessUnitID']) && !empty($_POST['businessUnitID'])) ?  Utility::clean_string($_POST['businessUnitID']): "";
    if($businessUnitID == 'newUnit') {
       $newBusinessUnit = (isset($_POST['newBusinessUnit']) && !empty($_POST['newBusinessUnit'])) ?  Utility::clean_string($_POST['newBusinessUnit']): "";
@@ -172,14 +167,13 @@ if ($isValidUser) {
    } else {
       $businessUnitID = $businessUnitID;
    }
-  
+
    $saleStatusLevelID = (isset($_POST['saleStatusLevelID']) && !empty($_POST['saleStatusLevelID'])) ?  Utility::clean_string($_POST['saleStatusLevelID']): "";
    $salesCaseEstimate = (isset($_POST['salesCaseEstimate']) && !empty($_POST['salesCaseEstimate'])) ?  Utility::clean_string($_POST['salesCaseEstimate']): "";
    $probability = (isset($_POST['probability']) && !empty($_POST['probability'])) ?  Utility::clean_string($_POST['probability']): "";
    $expectedCloseDate = (isset($_POST['expectedCloseDate']) && !empty($_POST['expectedCloseDate']) &&  preg_match($config['ISODateFormat'], Utility::clean_string($_POST['expectedCloseDate']))) ?  Utility::clean_string($_POST['expectedCloseDate']): "";
    $leadSourceID = (isset($_POST['leadSourceID']) && !empty($_POST['leadSourceID'])) ?  Utility::clean_string($_POST['leadSourceID']): "";
-   
-   var_dump($leadSourceID);
+   $salesCaseNotes = (isset($_POST['salesCaseNotes']) && !empty($_POST['salesCaseNotes'])) ?  Utility::clean_string($_POST['salesCaseNotes']): "";
    if($leadSourceID== 'newSource') {
       echo "New Lead Source";
       $newLeadSource = (isset($_POST['newLeadSource']) && !empty($_POST['newLeadSource'])) ?  Utility::clean_string($_POST['newLeadSource']): "";
@@ -191,35 +185,29 @@ if ($isValidUser) {
                $errors[] = 'Error adding new Lead Source';
             } else {
                $leadSourceID = $DBConn->lastInsertID();
-
-               echo "<h5> New Lead Source Added {$leadSourceID}</h5>";
             }
          }
       }
    } else {
       $leadSourceID = $leadSourceID;
-   } 
+   }
 
    if(!$salesCaseID) {
       $salesCaseName ? $details['salesCaseName'] = $salesCaseName : $errors[] = 'Case Name is required';
-      $clientID ? $details['clientID'] = $clientID : $errors[] = 'Client is required'; 
+      $clientID ? $details['clientID'] = $clientID : $errors[] = 'Client is required';
       $salesCaseContactID ? $details['salesCaseContactID'] = $salesCaseContactID : "";
       $orgDataID ? $details['orgDataID'] = $orgDataID : $errors[] = 'Organization Data is required';
       $entityID ? $details['entityID'] = $entityID : $errors[] = 'Entity is required';
       $businessUnitID ? $details['businessUnitID'] = $businessUnitID : $errors[] = 'Business Unit is required';
       $salesPersonID ? $details['salesPersonID'] = $salesPersonID : $errors[] = 'salesPerson is required';
-      $saleStatusLevelID ? $details['saleStatusLevelID'] = $saleStatusLevelID : $errors[] = 'Status Level is required';    
-      $salesStage ? $details['saleStage'] = $salesStage : $errors[] = 'Sales Stage is required'; 
+      $saleStatusLevelID ? $details['saleStatusLevelID'] = $saleStatusLevelID : $errors[] = 'Status Level is required';
+      $salesStage ? $details['saleStage'] = $salesStage : $errors[] = 'Sales Stage is required';
       $salesCaseEstimate ? $details['salesCaseEstimate'] = $salesCaseEstimate : $errors[] = 'Sale Estimate is required';
       $probability ? $details['probability'] = $probability : $errors[] = 'Probability is required';
       $expectedCloseDate ? $details['expectedCloseDate'] = $expectedCloseDate : $errors[] = 'Expected Close Date is required';
       $leadSourceID ? $details['leadSourceID'] = $leadSourceID : $errors[] = 'Lead Source is required';
       $closeStatus ? $details['closeStatus'] = $closeStatus : "";
-      $dateClosed ? $details['dateClosed'] = $dateClosed : "";    
-    
-      echo "<h5>Sales case Details</h5>";
-
-      var_dump($details);
+      $dateClosed ? $details['dateClosed'] = $dateClosed : "";
       if(!$errors) {
          if($details){
             $details['DateAdded'] = $config['currentDateTimeFormated'];
@@ -244,7 +232,7 @@ if ($isValidUser) {
                   'notificationStatus' => 'unread',
                   'originatorUserID' => $userDetails->ID,
                   'targetUserID' => $salesPersonID,
-                  
+
                );
                if(!$DBConn->insert_data('tija_notifications', $notificationArr)) {
                   $errors[] = 'Failed to add notification for sales case assignment';
@@ -256,14 +244,8 @@ if ($isValidUser) {
       }
    } else {
       $salesCaseDetails = Sales::sales_cases(array('salesCaseID'=>$salesCaseID), true, $DBConn);
-      var_dump($salesCaseDetails);
-      var_dump($suspended);
       $orgDataID= $salesCaseDetails->orgDataID;
       $entityID= $salesCaseDetails->entityID;
-
-      var_dump($saleStage);
-
-      var_dump($orgDataID);
       $orgDataID && $orgDataID != $salesCaseDetails->orgDataID ? $changes['orgDataID'] = $orgDataID : "";
 
       $entityID && $entityID != $salesCaseDetails->entityID ? $changes['entityID'] = $entityID : "";
@@ -271,7 +253,7 @@ if ($isValidUser) {
       $salesCaseName && $salesCaseName != $salesCaseDetails->salesCaseName ? $changes['salesCaseName'] = $salesCaseName : "";
       $clientID && $clientID != $salesCaseDetails->clientID ? $changes['clientID'] = $clientID : "";
       $saleStage && $saleStage != $salesCaseDetails->saleStage ? $changes['saleStage'] = $saleStage : "";
-    
+
       $businessUnitID && $businessUnitID != $salesCaseDetails->businessUnitID ? $changes['businessUnitID'] = $businessUnitID : "";
       $saleStatusLevelID && $saleStatusLevelID != $salesCaseDetails->saleStatusLevelID ? $changes['saleStatusLevelID'] = $saleStatusLevelID : "";
       $salesCaseEstimate && $salesCaseEstimate != $salesCaseDetails->salesCaseEstimate ? $changes['salesCaseEstimate'] = $salesCaseEstimate : "";
@@ -282,13 +264,11 @@ if ($isValidUser) {
       $closeStatus && $salesCaseDetails->closeStatus != $closeStatus ? $changes['closeStatus'] = $closeStatus : "";
       $dateClosed && $salesCaseDetails->dateClosed != $dateClosed ? $changes['dateClosed'] = $dateClosed : "";
       $salesCaseContactID && $salesCaseContactID != $salesCaseDetails->salesCaseContactID ? $changes['salesCaseContactID'] = $salesCaseContactID : "";
+      $salesCaseNotes && $salesCaseNotes != $salesCaseDetails->salesCaseNotes ? $changes['salesCaseNotes'] = $salesCaseNotes : "";
       if(isset($changes['saleStatusLevelID']) && $changes['saleStatusLevelID'] ) {
-         $salesLevelDetails = Sales::sales_status_levels(array('saleStatusLevelID'=>$changes['saleStatusLevelID']), true, $DBConn);       
+         $salesLevelDetails = Sales::sales_status_levels(array('saleStatusLevelID'=>$changes['saleStatusLevelID']), true, $DBConn);
          $changes['probability'] = $salesLevelDetails->levelPercentage;
-         
       }
-
-      var_dump($changes);
       if(!$errors) {
          if($changes) {
             $changes['LastUpdate'] = $config['currentDateTimeFormated'];
@@ -302,12 +282,11 @@ if ($isValidUser) {
                   $returnURL = "?s=user&ss=projects&p=home&orderid={$salesCaseID}&state=order&orgDataID={$orgDataID}&entityID={$entityID}";
                } else if($saleStage == 'lost' && $closeStatus == 'lost') {
                   $success .= " and marked as lost";
-               } 
+               }
             }
          }
       }
-   }   
-   var_dump($errors);
+   }
 
    // $returnURL= !$returnURL ?  Utility::returnURL($_SESSION['returnURL'], 's=admin&ss=performancep=home') : $returnURL;
    if(!$returnURL) {

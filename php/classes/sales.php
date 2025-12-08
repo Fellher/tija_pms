@@ -777,7 +777,17 @@
          'downloadCount',
          'LastUpdate',
          'LastUpdatedByID',
-         'Suspended'
+         'Suspended',
+         'salesStage',
+         'saleStatusLevelID',
+         'documentStage',
+         'tags',
+         'expiryDate',
+         'linkedActivityID',
+         'sharedWithClient',
+         'sharedDate',
+         'viewCount',
+         'lastAccessedDate'
       );
 
       $salesCaseArray = array('salesCaseID', 'salesCaseName');
@@ -836,6 +846,16 @@
          sd.LastUpdate,
          sd.LastUpdatedByID,
          sd.Suspended,
+         sd.salesStage,
+         sd.saleStatusLevelID,
+         sd.documentStage,
+         sd.tags,
+         sd.expiryDate,
+         sd.linkedActivityID,
+         sd.sharedWithClient,
+         sd.sharedDate,
+         sd.viewCount,
+         sd.lastAccessedDate,
          sc.salesCaseName,
          p.proposalTitle,
          CONCAT(u1.FirstName, ' ', u1.Surname) as uploadedByName,

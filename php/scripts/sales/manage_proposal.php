@@ -32,7 +32,7 @@ if ($isValidUser) {
 		var_dump($_FILES);
 	}
 
-   $employeeID = (isset($_POST['employeID']) && !empty($_POST['employeID'])) ? Utility::clean_string($_POST['employeID']) : "";
+   $employeeID = (isset($_POST['employeeID']) && !empty($_POST['employeeID'])) ? Utility::clean_string($_POST['employeeID']) : "";
    $entityID = (isset($_POST['entityID']) && !empty($_POST['entityID'])) ? Utility::clean_string($_POST['entityID']) : "";
    $orgDataID = (isset($_POST['orgDataID']) && !empty($_POST['orgDataID'])) ? Utility::clean_string($_POST['orgDataID']) : "";
    $proposalID = (isset($_POST['proposalID']) && !empty($_POST['proposalID'])) ? Utility::clean_string($_POST['proposalID']) : "";
@@ -114,9 +114,32 @@ if ($isValidUser) {
       $proposalDescription ? $details['proposalDescription'] = Utility::clean_string($proposalDescription) : $errors[] = "Please submit valid proposal description";
       $proposalComments ? $details['proposalComments'] = Utility::clean_string($proposalComments) : "";
       $proposalValue ? $details['proposalValue'] = Utility::clean_string($proposalValue) : $errors[] = "Please submit valid proposal value";
-      $employeeID ? $details['employeeID'] = Utility::clean_string($employeeID) : "";
-      $entityID ? $details['entityID'] = Utility::clean_string($entityID) : "";
-      $orgDataID ? $details['orgDataID'] = Utility::clean_string($orgDataID) : "";
+
+      // Critical fields - use submitted values or fallback to user's session values
+      if ($employeeID) {
+         $details['employeeID'] = Utility::clean_string($employeeID);
+      } elseif (isset($userDetails->ID)) {
+         $details['employeeID'] = $userDetails->ID;
+      } else {
+         $errors[] = "Please submit valid employee ID";
+      }
+
+      if ($entityID) {
+         $details['entityID'] = Utility::clean_string($entityID);
+      } elseif (isset($userDetails->entityID)) {
+         $details['entityID'] = $userDetails->entityID;
+      } else {
+         $errors[] = "Please submit valid entity ID";
+      }
+
+      if ($orgDataID) {
+         $details['orgDataID'] = Utility::clean_string($orgDataID);
+      } elseif (isset($userDetails->orgDataID)) {
+         $details['orgDataID'] = $userDetails->orgDataID;
+      } else {
+         $errors[] = "Please submit valid organization data ID";
+      }
+
       $proposalCode ? $details['proposalCode'] = Utility::clean_string($proposalCode) : $errors[] = "Please submit valid proposal code";
 
       if (count($errors) === 0) {

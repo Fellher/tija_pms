@@ -12,8 +12,40 @@ $details=array();
 $changes= array();
 $addressDetails = array();
 $success = "";
+
 if ($isValidUser) {
-	var_dump($_POST);
+   // Handle DELETE action (GET request)
+   if (isset($_GET['action']) && $_GET['action'] === 'delete') {
+      $clientDocumentID = isset($_GET['clientDocumentID']) ? (int)$_GET['clientDocumentID'] : 0;
+
+      if ($clientDocumentID <= 0) {
+         $errors[] = 'Invalid document ID for deletion.';
+      } else {
+         // Get document details before deleting
+         $documentDetails = Client::client_documents(['clientDocumentID' => $clientDocumentID], true, $DBConn);
+
+         if (!$documentDetails) {
+            $errors[] = 'Document not found.';
+         } else {
+            // Delete the physical file if it exists
+            if (isset($documentDetails->clientDocumentFile) && file_exists($documentDetails->clientDocumentFile)) {
+               @unlink($documentDetails->clientDocumentFile);
+            }
+
+            // Delete from database
+            if (!$DBConn->delete_row('tija_client_documents', ['clientDocumentID' => $clientDocumentID])) {
+               $errors[] = 'Failed to delete document from database.';
+            } else {
+               $success = "Document '{$documentDetails->clientDocumentName}' deleted successfully.";
+            }
+         }
+      }
+
+      // Skip to the end
+      goto end_processing;
+   }
+
+   var_dump($_POST);
    var_dump($_FILES);
    $fileUpload = null;
 
@@ -48,7 +80,7 @@ if ($isValidUser) {
                   $documentTypeID = $DBConn->lastInsertId();
                   $details['documentTypeID'] = $documentTypeID;
                }
-            }            
+            }
          }
       }
 
@@ -103,7 +135,7 @@ if ($isValidUser) {
             $changes['documentFilePath'] = $fileUpload['fileDestination'];
          } elseif($fileUpload && $fileUpload['status'] == 'error') {
             $errors = array_merge($errors, $fileUpload['errors']);
-           
+
          }
 
          if(!$errors){
@@ -123,14 +155,16 @@ if ($isValidUser) {
 
 
       }
-   }  
-   
+   }
+
    var_dump($errors);
-} else { 
+} else {
    $errors[] = 'You need to log in as a valid administrator to do that.';
 }
+
+end_processing:
 $returnURL= Utility::returnURL($_SESSION['returnURL'], 's=admin&ss=performancep=home');
-  var_dump($returnURL);
+var_dump($returnURL);
 if (count($errors) == 0) {
   $DBConn->commit();
   $messages = array(array('Text'=>"{$success}", 'Type'=>'success'));

@@ -201,21 +201,25 @@ class Schedule {
             if($row->activityDurationEndDate){
                $rows[$key]->activityDurationEndDate = date('Y-m-d', strtotime($row->activityDurationEndDate));
             }
-         $participantsIDs = explode(',', $row->activityParticipants);
-
-         // var_dump($participantsIDs);
+         // Handle participants - check if field exists and is not empty
          $participantsDetails = [];
-         if($participantsIDs){
+         if(isset($row->activityParticipants) && !empty($row->activityParticipants)){
+            $participantsIDs = explode(',', $row->activityParticipants);
+            // var_dump($participantsIDs);
             foreach ($participantsIDs as $participantID) {
                if(Utility::clean_string($participantID)){
                   $participantDetails = Core::user(['ID'=>$participantID], true, $DBConn);
                   // var_dump($participantDetails);
-                  $participantName = Core::user_name($participantID, $DBConn);
-                  $participantsDetails[] = (object)[
-                     'name' => $participantName,
-                     'id' => $participantDetails->ID,
-                     'email' => $participantDetails->Email
-                  ];
+                  
+                  // Check if participant exists before accessing properties
+                  if($participantDetails && is_object($participantDetails)){
+                     $participantName = Core::user_name($participantID, $DBConn);
+                     $participantsDetails[] = (object)[
+                        'name' => $participantName,
+                        'id' => $participantDetails->ID,
+                        'email' => $participantDetails->Email ?? ''
+                     ];
+                  }
                }
             }
             $rows[$key]->activityParticipantsDetails = $participantsDetails;

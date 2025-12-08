@@ -23,6 +23,11 @@ $salesCases = Sales::sales_cases(array('orgDataID'=>$orgDataID, 'entityID'=>$ent
 $proposals = Sales::proposal_full(array('orgDataID'=>$orgDataID, 'entityID'=>$entityID), false, $DBConn);
 // var_dump($proposals);
 
+// Ensure $proposals is an array to prevent warnings
+if (!is_array($proposals)) {
+    $proposals = [];
+}
+
 $last30DaysProposals = array_filter($proposals, function($proposal) {
     return strtotime($proposal->DateAdded) >= strtotime('-30 days');
 });

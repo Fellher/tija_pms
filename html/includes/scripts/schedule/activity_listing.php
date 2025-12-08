@@ -9,21 +9,21 @@
       </span>
       <div class="w-100  row">
          <div class="col-md-5">
-            <span class="d-block"> 
-               <?= $activity->activityName ?> 
+            <span class="d-block">
+               <?= $activity->activityName ?>
             </span>
             <span class="d-block">
-               <?= "<span class='mx-2' > " .Utility::date_format($activity->activityDate, 'shortStr') . "</span>"; ?> 
-               <?= $activity->activityStartTime ? "|<span class='mx-2'> " . date('g:i A', strtotime($activity->activityStartTime)) . "</span>"  : "" ?> 
+               <?= "<span class='mx-2' > " .Utility::date_format($activity->activityDate, 'shortStr') . "</span>"; ?>
+               <?= $activity->activityStartTime ? "|<span class='mx-2'> " . date('g:i A', strtotime($activity->activityStartTime)) . "</span>"  : "" ?>
             </span>
-         
-         </div> 
+
+         </div>
          <div class="col-md-7">
             <span class="d-block">
                <?php echo "<span class='mx-2'>".$activity->clientID ? $activity->clientName : "". "</span>" ?>
             </span>
             <span class="d-block">
-            
+
                <?php
                $salesCaseName = $activity->activitySegment && $activity->activitySegment == "sales" && !empty($activity->salesCaseID) ? $activity->salesCaseName : "";
                $projectCaseName = $activity->activitySegment && $activity->activitySegment == "project" && !empty($activity->projectID) ? $activity->projectName : "";
@@ -35,9 +35,9 @@
                   echo "<span class='mx-2'> {$projectCaseName} </span>";
                } else {
                   echo "<span class='mx-2'> No Case </span>";
-               }?> 
-            </span>    
-         </div>                  
+               }?>
+            </span>
+         </div>
       </div>
    </div>
       <?php
@@ -46,40 +46,40 @@
       $participantDetails = [];
       if($participants ) {
          foreach($participants as $participant) {
-            $participantDetails[] = Core::get_user_name_initials($participant, $DBConn);                                    
-         }         
+            $participantDetails[] = Core::get_user_name_initials($participant, $DBConn);
+         }
       }?>
       <script>
          document.addEventListener('DOMContentLoaded', function() {
-            let participantDetails = <?= json_encode($participantDetails) ?>;             
-            participantDetailsString = JSON.stringify(participantDetails);          
+            let participantDetails = <?= json_encode($participantDetails) ?>;
+            participantDetailsString = JSON.stringify(participantDetails);
             document.querySelectorAll('.editActivityBtn').forEach(button => {
             button.dataset.participantDetails = participantDetailsString;
             });
          });
       </script>
 
-      <div class="text-end d-flex justify-content-end ">                                  
+      <div class="text-end d-flex justify-content-end ">
          <span class="text-primary font-14 d-block px-2 ">
             <span class="avatar bd-blue-800 avatar-xs mx-2 avatar-rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= $activity->activityOwnerName ?> - <?= $activity->activityOwnerEmail ?>">
                <AC><?= Utility::generate_initials($activity->activityOwnerName) ?> </AC>
-            </span> 
-         </span>  
-        
-            
+            </span>
+         </span>
+
+
 
          <div class="col text-end">
 
-         <?php 
+         <?php
          if($userDetails->ID == $activity->activityOwnerID) { ?>
             <!-- Edit Activity -->
-            <a 
-               href="#manage_activity" 
-               data-bs-toggle="modal" 
-               role="button" 
-               aria-expanded="false" 
+            <a
+               href="#manage_activity"
+               data-bs-toggle="modal"
+               role="button"
+               aria-expanded="false"
                aria-controls="manage_activity"
-               class="btn btn-primary-light btn-sm rounded-circle editActivityBtn" 
+               class="btn btn-primary-light btn-sm rounded-circle editActivityBtn"
                data-activity-id="<?= $activityMini->activityID ?>"
                data-org-data-id ="<?= $orgDataID ?>"
                data-entity-id ="<?= $activity->entityID ?>"
@@ -114,24 +114,24 @@
                data-activity-status-id = "<?= $activity->activityStatusID ?>"
                data-activity-priority = "<?= $activity->activityPriority ?>"
                data-activity-owner-id = "<?= $activity->activityOwnerID ?>"
-               data-activity-participants = "<?= $activity->activityParticipants ?>"             
+               data-activity-participants = "<?= $activity->activityParticipants ?>"
                data-activity-notes-id = "<?= $activity->activityNotesID ?>"
                data-participants-arr = "<?= htmlspecialchars(json_encode($participantDetails))?>"
             >
                <i class="ri-edit-line" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Activity"></i>
             </a>
-            <?php 
+            <?php
          }?>
           <?php if($activity->activityStatusID != 4) { ?>
             <!-- Postpone Activity -->
-            <a 
-               href="#postponeActivity" 
-               data-bs-toggle="modal" 
-               role="button" 
-               aria-expanded="false" 
+            <a
+               href="#postponeActivity"
+               data-bs-toggle="modal"
+               role="button"
+               aria-expanded="false"
                aria-controls="postponeActivity"
                class="btn btn-warning-light btn-sm rounded-circle postponeActivityBtn"
-               data-activity="<?= htmlspecialchars(json_encode($activity)) ?>"                                    
+               data-activity="<?= htmlspecialchars(json_encode($activity)) ?>"
                data-activity-id="<?= $activity->activityID ?>"
                data-activity-date="<?= $activity->activityDate ?>"
                data-activity-start-time="<?= $activity->activityStartTime ?>"
@@ -143,11 +143,11 @@
                <i class="ri-time-line" data-bs-toggle="tooltip" data-bs-placement="top" title="Postpone Activity instance"></i>
             </a>
           <!-- Delete Activity -->
-            <a 
-               href="#deleteActivity" 
-               data-bs-toggle="modal" 
-               role="button" 
-               aria-expanded="false" 
+            <a
+               href="#deleteActivity"
+               data-bs-toggle="modal"
+               role="button"
+               aria-expanded="false"
                aria-controls="deleteActivity"
                class="btn btn-danger-light btn-sm rounded-circle"
                data-activity-id="<?= $activity->activityID ?>"
@@ -156,12 +156,12 @@
                <i class="ri-delete-bin-line" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete Activity"> </i>
             </a>
             <!-- Complete Activity -->
-            
-            <a 
-               href="#complete_activity"                
-               role="button" 
-               aria-expanded="false" 
-               data-bs-toggle="modal" 
+
+            <a
+               href="#complete_activity"
+               role="button"
+               aria-expanded="false"
+               data-bs-toggle="modal"
                aria-controls="completeActivity"
                class="btn btn-success-light btn-sm rounded-circle completeActivityBtn"
                data-activity-id="<?= $activity->activityID ?>"
@@ -171,7 +171,7 @@
                data-employee-id = "<?= $employeeID ?>"
                data-activity-date ="<?= $dt->format('Y-m-d') ?>"
                data-work-segment-id="<?= $activity->workSegmentID ? $activity->workSegmentID : "3" ?>"
-               data-task-type= "activity" 
+               data-task-type= "activity"
                data-task-date = "<?= $dt->format('Y-m-d') ?>"
                data-instance = "<?= isset($activity->instance) ? $activity->instance : "" ?>"
                data-recurring-instance-id = "<?= isset($activity->recurringInstanceID) ? $activity->recurringInstanceID : ""  ?>"
@@ -187,24 +187,28 @@
    </div>
    <div class="row">
       <div class="col-md d-flex align-items-center justify-content-start">
-         <span class="d-block fst-italic "> 
-            <?= $activity->activityDescription ?> 
+         <span class="d-block fst-italic ">
+            <?= $activity->activityDescription ?>
          </span>
       </div>
-      
+
       <div class="col-md text-end">
-         <span class=" d-block fst-italic mt-2"> 
+         <span class=" d-block fst-italic mt-2">
             <?php
-               if($participants) {
+               if($participants && is_array($participantDetails) && count($participantDetails) > 0) {
                   foreach($participantDetails as $participant) {
-                     echo "<span class='avatar bd-tija-blue avatar-xs mx-2 avatar-rounded' data-bs-toggle='tooltip' data-bs-placement='top' title='{$participant['name']}'>
-                              <AC>{$participant['initials']}</AC>
-                           </span>";
+                     if(is_array($participant) && isset($participant['name'])) {
+                        $participantInitials = isset($participant['initials']) ? $participant['initials'] : '';
+                        $participantName = isset($participant['name']) ? $participant['name'] : 'Unknown';
+                        echo "<span class='avatar bd-tija-blue avatar-xs mx-2 avatar-rounded' data-bs-toggle='tooltip' data-bs-placement='top' title='{$participantName}'>
+                                 <AC>{$participantInitials}</AC>
+                              </span>";
+                     }
                   }
                } else {
-                  echo "<span class='text-danger'>No Participants</span>";
+                  echo "<span class='text-muted small'>No Participants</span>";
                }?>
          </span>
       </div>
-   </div>    
+   </div>
 </div>

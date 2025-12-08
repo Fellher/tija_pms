@@ -41,16 +41,16 @@
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Dashboards</a></li>
                         <?php
                         if($isValidAdmin) {
-                            echo "<li class='slide'><a href='{$base}html/?s=core&ss=admin&p=home' class='side-menu__item'>Organisation</a></li>";?>
-                             <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=user_roles" ?>" class="side-menu__item <?php echo $p=="user_roles" ? "active" : ""; ?>">Manage User Roles</a></li>
+                            echo "<li class='slide'><a href='{$base}html/?s=core&ss=admin&p=home' class='side-menu__item'><i class='ri-building-line me-2'></i>Organisation</a></li>";?>
+                             <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=user_roles" ?>" class="side-menu__item <?php echo $p=="user_roles" ? "active" : ""; ?>"><i class="ri-user-settings-line me-2"></i>Manage User Roles</a></li>
                              <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=license_types" ?>" class="side-menu__item <?php echo $p=="license_types" ? "active" : ""; ?>"><i class="fas fa-certificate me-2"></i>License Types</a></li>
                              <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=role_types" ?>" class="side-menu__item <?php echo $p=="role_types" ? "active" : ""; ?>"><i class="fas fa-layer-group me-2"></i>Role Types</a></li>
                              <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=role_levels" ?>" class="side-menu__item <?php echo $p=="role_levels" ? "active" : ""; ?>"><i class="fas fa-sitemap me-2"></i>Role Levels</a></li>
                              <?php
                         } ?>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=jobs" ?>" class="side-menu__item <?php echo $p=="jobs" ? "active" : ""; ?>">Jobs</a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=home" ?>" class="side-menu__item <?php echo $p=="organisation" ? "active" : ""; ?>">Organisation</a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=work_settings" ?>" class="side-menu__item <?php echo $p=="users" ? "active" : ""; ?>">Work Time, travel, & Products</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=jobs" ?>" class="side-menu__item <?php echo $p=="jobs" ? "active" : ""; ?>"><i class="ri-briefcase-line me-2"></i>Jobs</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=home" ?>" class="side-menu__item <?php echo $p=="organisation" ? "active" : ""; ?>"><i class="ri-building-line me-2"></i>Organisation</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=work_settings" ?>" class="side-menu__item <?php echo $p=="users" ? "active" : ""; ?>"><i class="ri-time-zone-line me-2"></i>Work Time, travel, & Products</a></li>
                         <!-- <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=tax" ?>" class="side-menu__item <?php echo $p=="tax" ? "active" : ""; ?>">Tax</a></li> -->
 
                     </ul>
@@ -67,7 +67,7 @@
                        <ul class="slide-menu child1">
                            <li class="slide side-menu__label1"><a href="javascript:void(0)">System Set Up</a></li>
 
-                           <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=home" ?>" class="side-menu__item">Organisation Setup</a></li>
+                           <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=home" ?>" class="side-menu__item"><i class="ri-settings-2-line me-2"></i>Organisation Setup</a></li>
 
                            <!-- <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&&sss=setup&p=user_upload" ?>" class="side-menu__item">Users</a></li>
                            <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&&sss=setup&p=admin_setup" ?>" class="side-menu__item">Admins</a></li> -->
@@ -90,8 +90,8 @@
                     </a>
                     <ul class="slide-menu child1">
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Employee Management </a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=users"?>" class="side-menu__item">Employee List</a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=home" ?>" class="side-menu__item">Organisation Setup</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=users"?>" class="side-menu__item"><i class="ri-user-list me-2"></i>Employee List</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=core&ss=admin&p=home" ?>" class="side-menu__item"><i class="ri-settings-2-line me-2"></i>Organisation Setup</a></li>
 
                     </ul>
                 </li>
@@ -105,7 +105,7 @@
                 </a>
                 <ul class="slide-menu child1">
                     <li class="slide side-menu__label1"><a href="javascript:void(0)"> Client Management </a></li>
-                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=clients&p=home"?>" class="side-menu__item">Client overview</a></li>
+                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=clients&p=home"?>" class="side-menu__item"><i class="ri-eye-line me-2"></i>Client overview</a></li>
 
                 </ul>
             </li>
@@ -119,15 +119,15 @@
                 </a>
                 <ul class="slide-menu child1">
                     <li class="slide side-menu__label1"><a href="javascript:void(0)">Sales</a></li>
-                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=home"?>" class="side-menu__item">Overview</a></li>
-                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=proposals"?>" class="side-menu__item">Proposals</a></li>
-                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=sales_analytics_dashboard"?>" class="side-menu__item">Sales dashboard</a></li>
+                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=home"?>" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
+                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=proposals"?>" class="side-menu__item"><i class="ri-file-paper-line me-2"></i>Proposals</a></li>
+                    <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=sales_analytics_dashboard"?>" class="side-menu__item"><i class="ri-bar-chart-line me-2"></i>Sales dashboard</a></li>
                     <?php
                     if($isAdmin || $isSalesAdmin || $isValidAdmin) {?>
                         <!-- <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=business_development"?>" class="side-menu__item">Business Development</a></li> -->
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=proposals_config"?>" class="side-menu__item">Proposals Config</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=proposals_config"?>" class="side-menu__item"><i class="ri-settings-3-line me-2"></i>Proposals Config</a></li>
                         <!-- <?= "<li class='slide '><a href='{$base}html/?s=core&ss=sales&p=manage_status' class='side-menu__item'>Manage Sales Status</a></li>";?> -->
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=sales_config" ?>" class="side-menu__item">Sales Configuration</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=sales_config" ?>" class="side-menu__item"><i class="ri-settings-4-line me-2"></i>Sales Configuration</a></li>
                         <?php
                     }?>
                 </ul>
@@ -142,10 +142,10 @@
                 </a>
                 <ul class="slide-menu child1">
                     <li class="slide side-menu__label1"><a href="javascript:void(0)">Projects</a></li>
-                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=projects&p=home" ?>" class="side-menu__item">Overview</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=projects&p=home" ?>" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
                     <?php
                     if($isAdmin ||  $isValidAdmin) {?>
-                        <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss={$ss}&p=project_variables" ?>" class="side-menu__item">Variables</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss={$ss}&p=project_variables" ?>" class="side-menu__item"><i class="ri-code-s-slash-line me-2"></i>Variables</a></li>
                         <?php
                     }?>
 
@@ -162,7 +162,7 @@
                 </a>
                 <ul class="slide-menu child1">
                     <li class="slide side-menu__label1"><a href="javascript:void(0)">Time & Attendance</a></li>
-                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=time_attendance&p=home" ?>" class="side-menu__item">Overview</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s=user&ss=time_attendance&p=home" ?>" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
                     <?php
                     if($isAdmin || $isValidAdmin) {?>
                         <!-- <li class="slide"><a href="#" class="side-menu__item">Reports</a></li> -->
@@ -214,10 +214,10 @@
                 </a>
                 <ul class="slide-menu child1">
                     <li class="slide side-menu__label1"><a href="javascript:void(0)">Schedule </a></li>
-                    <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=task" ?>" class="side-menu__item">To-do</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=task" ?>" class="side-menu__item"><i class="ri-checkbox-line me-2"></i>To-do</a></li>
                     <!-- <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=to_do_list" ?>" class="side-menu__item">To-do List</a></li> -->
-                    <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=calendar" ?>" class="side-menu__item">Calendar</a></li>
-                    <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=activities_enhanced" ?>" class="side-menu__item">Activities Enhanced</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=calendar" ?>" class="side-menu__item"><i class="ri-calendar-2-line me-2"></i>Calendar</a></li>
+                    <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=activities_enhanced" ?>" class="side-menu__item"><i class="ri-list-check me-2"></i>Activities Enhanced</a></li>
                     <!-- <li class="slide"><a href="<?= "{$base}html/?s={$s}&ss=schedule&p=task_kanban" ?>" class="side-menu__item">Task Kanban</a></li> -->
 
 
@@ -250,6 +250,12 @@
                         <li class="slide"><a href="<?= "{$base}html/?s=user&ss=leave&p=leave_calendar_interactive" ?>" class="side-menu__item">
                             <i class="ri-calendar-2-line me-2"></i>Interactive Calendar
                         </a></li>
+                        <?php if($isHRManager || $isAdmin || $isValidAdmin): ?>
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Analytics & Reports</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=leave&p=leave_analytics" ?>" class="side-menu__item">
+                            <i class="ri-bar-chart-box-line me-2"></i>Leave Analytics
+                        </a></li>
+                        <?php endif; ?>
                     </ul>
                 </li>
                 <!-- End::slide -->
@@ -342,6 +348,9 @@
 
                         <!-- Reports & Analytics -->
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Reports & Analytics</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=leave&p=leave_analytics" ?>" class="side-menu__item <?= (isset($p) && $p == 'leave_analytics' && isset($ss) && $ss == 'leave') ? 'active' : '' ?>">
+                            <i class="ri-bar-chart-box-line me-2"></i>Leave Analytics Dashboard
+                        </a></li>
                         <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=leave&p=reports" ?>" class="side-menu__item <?= (isset($p) && $p == 'reports' && isset($ss) && $ss == 'leave') ? 'active' : '' ?>">
                             <i class="ri-bar-chart-line me-2"></i>Reports & Analytics
                         </a></li>
@@ -442,6 +451,78 @@
                 <?php endif; ?>
                 <!-- End::slide -->
 
+                <!-- Start::slide - Goals & Performance Administration (Admin Section) -->
+                <?php if($isAdmin || $isValidAdmin): ?>
+                <li class="slide has-sub">
+                    <a href="javascript:void(0);" class="side-menu__item">
+                    <i class="ri-settings-4-line side-menu__icon"></i>
+                        <span class="side-menu__label">Goals & Performance Admin</span>
+                        <i class="ri ri-arrow-right-s-line side-menu__angle"></i>
+                    </a>
+                    <ul class="slide-menu child1">
+                        <!-- Dashboard -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Overview</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=dashboard" ?>" class="side-menu__item <?= (isset($p) && $p == 'dashboard' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-dashboard-2-line me-2"></i>Dashboard
+                        </a></li>
+
+                        <!-- Goal Management -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Goal Management</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=library" ?>" class="side-menu__item <?= (isset($p) && $p == 'library' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-book-open-line me-2"></i>Goal Library
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=cascade" ?>" class="side-menu__item <?= (isset($p) && $p == 'cascade' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-flow-chart-line me-2"></i>Cascade Management
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=evaluation_config" ?>" class="side-menu__item <?= (isset($p) && $p == 'evaluation_config' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-settings-4-line me-2"></i>Evaluation Config
+                        </a></li>
+
+                        <!-- Analytics & Reporting -->
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Analytics & Reporting</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=reports" ?>" class="side-menu__item <?= (isset($p) && $p == 'reports' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-bar-chart-box-line me-2"></i>Reports & Analytics
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=strategy_map" ?>" class="side-menu__item <?= (isset($p) && $p == 'strategy_map' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-map-2-line me-2"></i>Strategy Map
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=admin&ss=goals&p=ahp_interface" ?>" class="side-menu__item <?= (isset($p) && $p == 'ahp_interface' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-node-tree me-2"></i>AHP Interface
+                        </a></li>
+                    </ul>
+                </li>
+                <?php endif; ?>
+                <!-- End::slide -->
+
+                <!-- Start::slide - Goals & Performance (User Section) -->
+                <li class="slide has-sub">
+                    <a href="javascript:void(0);" class="side-menu__item">
+                    <i class="ri-settings-4-line side-menu__icon"></i>
+                        <span class="side-menu__label">Goals & Performance</span>
+                        <i class="ri ri-arrow-right-s-line side-menu__angle"></i>
+                    </a>
+                    <ul class="slide-menu child1">
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">My Goals</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=goals&p=dashboard" ?>" class="side-menu__item <?= (isset($p) && $p == 'dashboard' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-dashboard-line me-2"></i>Dashboard
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=goals&p=goal_detail" ?>" class="side-menu__item <?= (isset($p) && $p == 'goal_detail' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-file-list-3-line me-2"></i>My Goals
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=goals&p=evaluations" ?>" class="side-menu__item <?= (isset($p) && $p == 'evaluations' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-star-line me-2"></i>Evaluations
+                        </a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=goals&p=matrix_team" ?>" class="side-menu__item <?= (isset($p) && $p == 'matrix_team' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-team-line me-2"></i>Matrix Team
+                        </a></li>
+                        <li class="slide side-menu__label1"><a href="javascript:void(0)">Settings</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=goals&p=settings" ?>" class="side-menu__item <?= (isset($p) && $p == 'settings' && isset($ss) && $ss == 'goals') ? 'active' : '' ?>">
+                            <i class="ri-settings-3-line me-2"></i>Automation Settings
+                        </a></li>
+                    </ul>
+                </li>
+                <!-- End::slide -->
+
                 <!-- Start::slide -->
                 <li class="slide has-sub">
                     <a href="javascript:void(0);" class="side-menu__item">
@@ -451,8 +532,8 @@
                     </a>
                     <ul class="slide-menu child1">
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Reports</a></li>
-                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=reporting&p=home" ?>" class="side-menu__item">Overview</a></li>
-                        <li class="slide"><a href="leaflet-maps.html" class="side-menu__item">Reports Gallery</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=reporting&p=home" ?>" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
+                        <li class="slide"><a href="leaflet-maps.html" class="side-menu__item"><i class="ri-gallery-line me-2"></i>Reports Gallery</a></li>
                     </ul>
                 </li>
                 <li class="slide has-sub">
@@ -463,11 +544,11 @@
                     </a>
                     <ul class="slide-menu child1">
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Invoicing </a></li>
-                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=list" ?>" class="side-menu__item <?php echo ($p=="list" && $ss=="invoices") ? "active" : ""; ?>">All Invoices</a></li>
-                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=create" ?>" class="side-menu__item <?php echo ($p=="create" && $ss=="invoices") ? "active" : ""; ?>">Create Invoice</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=list" ?>" class="side-menu__item <?php echo ($p=="list" && $ss=="invoices") ? "active" : ""; ?>"><i class="ri-file-list-3-line me-2"></i>All Invoices</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=create" ?>" class="side-menu__item <?php echo ($p=="create" && $ss=="invoices") ? "active" : ""; ?>"><i class="ri-add-circle-line me-2"></i>Create Invoice</a></li>
                         <?php if($isAdmin || $isValidAdmin): ?>
-                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=templates" ?>" class="side-menu__item <?php echo ($p=="templates" && $ss=="invoices") ? "active" : ""; ?>">Invoice Templates</a></li>
-                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=reports" ?>" class="side-menu__item <?php echo ($p=="reports" && $ss=="invoices") ? "active" : ""; ?>">Reports</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=templates" ?>" class="side-menu__item <?php echo ($p=="templates" && $ss=="invoices") ? "active" : ""; ?>"><i class="ri-file-copy-line me-2"></i>Invoice Templates</a></li>
+                        <li class="slide"><a href="<?= "{$base}html/?s=user&ss=invoices&p=reports" ?>" class="side-menu__item <?php echo ($p=="reports" && $ss=="invoices") ? "active" : ""; ?>"><i class="ri-bar-chart-line me-2"></i>Reports</a></li>
                         <?php endif; ?>
                     </ul>
                 </li>
@@ -488,7 +569,7 @@
                     </a>
                     <ul class="slide-menu child1">
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Reports</a></li>
-                        <li class="slide"><a href="google-maps.html" class="side-menu__item">Overview</a></li>
+                        <li class="slide"><a href="google-maps.html" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
                         <!-- <li class="slide"><a href="leaflet-maps.html" class="side-menu__item">Reports Gallery</a></li>                         -->
                     </ul>
                 </li>
@@ -503,9 +584,9 @@
                     </a>
                     <ul class="slide-menu child1">
                         <li class="slide side-menu__label1"><a href="javascript:void(0)">Support Desk</a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=tax&ss=admin&p=data_upload" ?>" class="side-menu__item <?php echo $p=="user_roles" ? "active" : ""; ?>">Overview</a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=tax&ss=admin&p=adjustment_config" ?>" class="side-menu__item <?php echo $p=="jobs" ? "active" : ""; ?>">My Tickets</a></li>
-                        <li class="slide"><a href="<?php echo "{$base}html/?s=tax&ss=admin&p=computation" ?>" class="side-menu__item <?php echo $p=="organisation" ? "active" : ""; ?>">Ticket Reports</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=tax&ss=admin&p=data_upload" ?>" class="side-menu__item <?php echo $p=="user_roles" ? "active" : ""; ?>"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=tax&ss=admin&p=adjustment_config" ?>" class="side-menu__item <?php echo $p=="jobs" ? "active" : ""; ?>"><i class="ri-ticket-line me-2"></i>My Tickets</a></li>
+                        <li class="slide"><a href="<?php echo "{$base}html/?s=tax&ss=admin&p=computation" ?>" class="side-menu__item <?php echo $p=="organisation" ? "active" : ""; ?>"><i class="ri-bar-chart-line me-2"></i>Ticket Reports</a></li>
                     </ul>
                 </li>
                 <?php

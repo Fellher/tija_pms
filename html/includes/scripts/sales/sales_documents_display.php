@@ -154,11 +154,55 @@ function formatFileSize($bytes) {
                                  <p class="text-muted small mb-2"><?= nl2br(htmlspecialchars(substr($doc->description, 0, 100))) ?><?= strlen($doc->description) > 100 ? '...' : '' ?></p>
                               <?php endif; ?>
 
+                              <!-- Sales Stage Badge -->
+                              <?php if(isset($doc->salesStage) && $doc->salesStage): ?>
+                                 <div class="mt-2">
+                                    <span class="badge <?=
+                                       $doc->salesStage === 'Lead' ? 'bg-info-transparent text-info' :
+                                       ($doc->salesStage === 'Opportunity' ? 'bg-primary-transparent text-primary' :
+                                       ($doc->salesStage === 'Proposal' ? 'bg-warning-transparent text-warning' :
+                                       ($doc->salesStage === 'Closed-Won' ? 'bg-success-transparent text-success' : 'bg-secondary-transparent text-secondary')))
+                                    ?>">
+                                       <i class="ri-flag-line me-1"></i><?= htmlspecialchars($doc->salesStage) ?>
+                                    </span>
+                                    <?php if(isset($doc->documentStage) && $doc->documentStage): ?>
+                                       <span class="badge bg-secondary-transparent text-secondary ms-1">
+                                          <?= ucfirst($doc->documentStage) ?>
+                                       </span>
+                                    <?php endif; ?>
+                                 </div>
+                              <?php endif; ?>
+
+                              <!-- Tags -->
+                              <?php if(isset($doc->tags) && $doc->tags): ?>
+                                 <div class="mt-2">
+                                    <?php
+                                    $tags = explode(',', $doc->tags);
+                                    foreach($tags as $tag):
+                                       $tag = trim($tag);
+                                       if($tag):
+                                    ?>
+                                       <span class="badge bg-light text-dark border me-1 mb-1">
+                                          <i class="ri-price-tag-3-line me-1"></i><?= htmlspecialchars($tag) ?>
+                                       </span>
+                                    <?php endif; endforeach; ?>
+                                 </div>
+                              <?php endif; ?>
+
                               <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
-                                 <small class="text-muted">
-                                    <i class="ri-user-line me-1"></i><?= htmlspecialchars($doc->uploadedByName ?? 'Unknown') ?><br>
-                                    <i class="ri-calendar-line me-1"></i><?= Utility::date_format($doc->DateAdded) ?>
-                                 </small>
+                                 <div>
+                                    <small class="text-muted d-block">
+                                       <i class="ri-user-line me-1"></i><?= htmlspecialchars($doc->uploadedByName ?? 'Unknown') ?>
+                                    </small>
+                                    <small class="text-muted d-block">
+                                       <i class="ri-calendar-line me-1"></i><?= Utility::date_format($doc->DateAdded) ?>
+                                    </small>
+                                    <?php if(isset($doc->viewCount) && $doc->viewCount > 0): ?>
+                                       <small class="text-muted d-block">
+                                          <i class="ri-eye-line me-1"></i><?= $doc->viewCount ?> views · <?= $doc->downloadCount ?? 0 ?> downloads
+                                       </small>
+                                    <?php endif; ?>
+                                 </div>
                                  <div class="btn-group btn-group-sm">
                                     <a href="<?= $base . $config['DataDir'] . $doc->fileURL ?>"
                                        target="_blank"
@@ -181,6 +225,11 @@ function formatFileSize($bytes) {
                                              <i class="ri-close-circle-line"></i>
                                           </span>
                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    <?php if(isset($doc->sharedWithClient) && $doc->sharedWithClient === 'Y'): ?>
+                                       <span class="badge bg-info-transparent text-info" title="Shared with Client">
+                                          <i class="ri-share-line"></i>
+                                       </span>
                                     <?php endif; ?>
                                  </div>
                               </div>

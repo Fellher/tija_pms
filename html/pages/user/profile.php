@@ -448,6 +448,10 @@ if ($isAdminLevelUser) {
                             <label class="form-label small text-primary">Other Names</label>
                             <input type="text" class="form-control form-control-sm" name="OtherNames" value="<?= htmlspecialchars($employeeDetails->OtherNames ?? '') ?>">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-primary">Initials</label>
+                            <input type="text" class="form-control form-control-sm" name="userInitials" value="<?= htmlspecialchars($employeeDetails->userInitials ?? '') ?>">
+                        </div>
 
                         <div class="mb-3">
                             <label class="form-label small text-primary">Email</label>

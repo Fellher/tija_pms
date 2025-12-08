@@ -96,6 +96,17 @@ function handleDocumentUpload($userID, $DBConn) {
         $isPublic = isset($_POST['isPublic']) && $_POST['isPublic'] === 'Y' ? 'Y' : 'N';
         $requiresApproval = isset($_POST['requiresApproval']) && $_POST['requiresApproval'] === 'Y' ? 'Y' : 'N';
 
+        // NEW: Stage tracking fields
+        $salesStage = isset($_POST['salesStage']) ? Utility::clean_string($_POST['salesStage']) : null;
+        $saleStatusLevelID = isset($_POST['saleStatusLevelID']) && !empty($_POST['saleStatusLevelID']) ? intval($_POST['saleStatusLevelID']) : null;
+        $documentStage = isset($_POST['documentStage']) ? Utility::clean_string($_POST['documentStage']) : null;
+        $tags = isset($_POST['tags']) ? Utility::clean_string($_POST['tags']) : null;
+        $expiryDate = isset($_POST['expiryDate']) && !empty($_POST['expiryDate']) ? Utility::clean_string($_POST['expiryDate']) : null;
+        $linkedActivityID = isset($_POST['linkedActivityID']) && !empty($_POST['linkedActivityID']) ? intval($_POST['linkedActivityID']) : null;
+        $sharedWithClient = isset($_POST['sharedWithClient']) && $_POST['sharedWithClient'] === 'Y' ? 'Y' : 'N';
+        $sharedDate = isset($_POST['sharedDate']) && !empty($_POST['sharedDate']) ? Utility::clean_string($_POST['sharedDate']) : null;
+        $version = isset($_POST['version']) ? Utility::clean_string($_POST['version']) : '1.0';
+
         // Validate file size (50MB max)
         $maxSize = 50 * 1024 * 1024; // 50MB in bytes
         if ($file['size'] > $maxSize) {
@@ -143,7 +154,7 @@ function handleDocumentUpload($userID, $DBConn) {
             'fileMimeType' => $fileMimeType,
             'documentCategory' => $documentCategory,
             'documentType' => $documentType,
-            'version' => '1.0',
+            'version' => $version,
             'uploadedBy' => $userID,
             'description' => $description,
             'expenseID' => $expenseID,
@@ -152,22 +163,43 @@ function handleDocumentUpload($userID, $DBConn) {
             'requiresApproval' => $requiresApproval,
             'approvalStatus' => $requiresApproval === 'Y' ? 'pending' : null,
             'downloadCount' => 0,
+            'viewCount' => 0,
             'DateAdded' => 'NOW()',
             'Suspended' => 'N'
         );
+
+        // Add stage tracking fields if available
+        if ($salesStage) $documentData['salesStage'] = $salesStage;
+        if ($saleStatusLevelID) $documentData['saleStatusLevelID'] = $saleStatusLevelID;
+        if ($documentStage) $documentData['documentStage'] = $documentStage;
+        if ($tags) $documentData['tags'] = $tags;
+        if ($expiryDate) $documentData['expiryDate'] = $expiryDate;
+        if ($linkedActivityID) $documentData['linkedActivityID'] = $linkedActivityID;
+        if ($sharedWithClient === 'Y') {
+            $documentData['sharedWithClient'] = $sharedWithClient;
+            if ($sharedDate) $documentData['sharedDate'] = $sharedDate;
+        }
 
         // Insert into database
         $result = $DBConn->insert_data('tija_sales_documents', $documentData);
 
         if ($result) {
             $documentID = $DBConn->lastInsertId();
+
+            // Log document access
+            logDocumentAccess($documentID, $userID, 'upload', $DBConn);
+
+            // Create initial version entry
+            createDocumentVersion($documentID, $version, $fileName, $fileURL, $fileSize, 'Initial upload', $userID, $DBConn);
+
             $response['success'] = true;
-            $response['message'] = 'Document uploaded successfully';
+            $response['message'] = 'Document uploaded successfully' . ($salesStage ? " at {$salesStage} stage" : '');
             $response['data'] = array(
                 'documentID' => $documentID,
                 'documentName' => $documentName,
                 'fileName' => $fileName,
-                'fileURL' => $fileURL
+                'fileURL' => $fileURL,
+                'salesStage' => $salesStage
             );
         } else {
             // Delete uploaded file if database insert fails
@@ -414,5 +446,91 @@ function handleDocumentApproval($userID, $DBConn) {
 
     echo json_encode($response);
     exit;
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Log document access (view, download, share, edit)
+ */
+function logDocumentAccess($documentID, $userID, $accessType = 'view', $DBConn) {
+    try {
+        // Check if table exists
+        $tableExists = false;
+        try {
+            $check = $DBConn->retrieve_db_table_rows('tija_sales_document_access_log', ['accessID'], ['1' => '0'], 1);
+            $tableExists = true;
+        } catch (Exception $e) {
+            return false; // Table doesn't exist yet
+        }
+
+        if (!$tableExists) return false;
+
+        $accessData = array(
+            'documentID' => $documentID,
+            'accessedBy' => $userID,
+            'accessType' => $accessType,
+            'accessDate' => date('Y-m-d H:i:s'),
+            'ipAddress' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? null
+        );
+
+        $DBConn->insert_data('tija_sales_document_access_log', $accessData);
+
+        // Update document view/download count
+        if ($accessType === 'view') {
+            $DBConn->execute("UPDATE tija_sales_documents SET viewCount = viewCount + 1, lastAccessedDate = NOW() WHERE documentID = ?", [$documentID]);
+        } elseif ($accessType === 'download') {
+            $DBConn->execute("UPDATE tija_sales_documents SET downloadCount = downloadCount + 1, lastAccessedDate = NOW() WHERE documentID = ?", [$documentID]);
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log("Failed to log document access: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Create document version entry
+ */
+function createDocumentVersion($documentID, $versionNumber, $fileName, $fileURL, $fileSize, $versionNotes, $userID, $DBConn) {
+    try {
+        // Check if table exists
+        $tableExists = false;
+        try {
+            $check = $DBConn->retrieve_db_table_rows('tija_sales_document_versions', ['versionID'], ['1' => '0'], 1);
+            $tableExists = true;
+        } catch (Exception $e) {
+            return false; // Table doesn't exist yet
+        }
+
+        if (!$tableExists) return false;
+
+        // Mark all previous versions as not current
+        $DBConn->update_table('tija_sales_document_versions',
+            array('isCurrent' => 'N'),
+            array('documentID' => $documentID)
+        );
+
+        $versionData = array(
+            'documentID' => $documentID,
+            'versionNumber' => $versionNumber,
+            'fileName' => $fileName,
+            'fileURL' => $fileURL,
+            'fileSize' => $fileSize,
+            'versionNotes' => $versionNotes,
+            'uploadedBy' => $userID,
+            'isCurrent' => 'Y'
+        );
+
+        $DBConn->insert_data('tija_sales_document_versions', $versionData);
+        return true;
+    } catch (Exception $e) {
+        error_log("Failed to create document version: " . $e->getMessage());
+        return false;
+    }
 }
 

@@ -23,6 +23,8 @@ try {
     $action = isset($_POST['action']) ? Utility::clean_string($_POST['action']) : '';
     $comments = isset($_POST['comments']) ? Utility::clean_string($_POST['comments']) : null;
     $leaveApplicationID = isset($_POST['leaveApplicationID']) ? (int)$_POST['leaveApplicationID'] : 0;
+    $submittedStepID = isset($_POST['stepID']) && !empty($_POST['stepID']) ? (int)$_POST['stepID'] : null;
+    $submittedStepOrder = isset($_POST['stepOrder']) && !empty($_POST['stepOrder']) ? (int)$_POST['stepOrder'] : null;
 
     // Validate inputs
     if (empty($action) || $leaveApplicationID === 0) {
@@ -144,45 +146,139 @@ try {
                 }
             }
 
-            // Get employee who submitted the application
-            $employeeID = $leaveApplication->employeeID ?? null;
-            $employee = null;
-            if ($employeeID) {
+            // Get employee who submitted the application (if not already retrieved)
+            if (!isset($employeeID) || !$employeeID) {
+                $employeeID = $leaveApplication->employeeID ?? null;
+            }
+            if (!isset($employee) && $employeeID) {
                 $employee = Employee::employees(array('ID' => $employeeID), true, $DBConn);
             }
 
-            // Find which step this approver belongs to (check saved approvers first)
-            $allApprovers = Leave::get_workflow_approvers($policyID, $DBConn);
+            // PRIORITY 1: Use submitted stepID and stepOrder if provided (from form)
+            if ($submittedStepID && $submittedStepOrder) {
+                // Validate that the submitted step exists in the policy
+                $stepValidation = Leave::leave_approval_steps(
+                    array('policyID' => $policyID, 'stepID' => $submittedStepID, 'Suspended' => 'N'),
+                    true,
+                    $DBConn
+                );
 
-            // If no saved approvers found, resolve dynamic approvers for this employee
-            if (empty($allApprovers) && $employee) {
-                $allApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
-                error_log("Resolved dynamic approvers for employee {$employeeID}: " . count($allApprovers) . " approver(s)");
-            }
-
-            foreach ($allApprovers as $approver) {
-                if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID) {
-                    $approverStepID = isset($approver['stepID']) ? (int)$approver['stepID'] : null;
-                    $stepOrder = isset($approver['stepOrder']) ? (int)$approver['stepOrder'] : null;
-                    if ($approverStepID) {
-                        $stepID = $approverStepID;
-                        break;
+                if ($stepValidation) {
+                    // Step exists - verify user is authorized for this step
+                    $employeeID = $leaveApplication->employeeID ?? null;
+                    $employee = null;
+                    if ($employeeID) {
+                        $employee = Employee::employees(array('ID' => $employeeID), true, $DBConn);
                     }
+
+                    // Quick check: resolve dynamic approvers and verify user matches
+                    $isAuthorized = false;
+                    if ($employee) {
+                        $dynamicApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
+                        foreach ($dynamicApprovers as $approver) {
+                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID
+                                && isset($approver['stepID']) && (int)$approver['stepID'] === $submittedStepID) {
+                                $isAuthorized = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Also check static approvers
+                    if (!$isAuthorized) {
+                        $staticApprovers = Leave::get_workflow_approvers($policyID, $DBConn);
+                        foreach ($staticApprovers as $approver) {
+                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID
+                                && isset($approver['stepID']) && (int)$approver['stepID'] === $submittedStepID) {
+                                $isAuthorized = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($isAuthorized) {
+                        $stepID = $submittedStepID;
+                        $stepOrder = $submittedStepOrder;
+                        error_log("Using submitted step information (VALIDATED): StepID: {$stepID}, StepOrder: {$stepOrder} for User {$userID}");
+                    } else {
+                        error_log("WARNING: User {$userID} not authorized for submitted stepID {$submittedStepID}. Will re-identify approver.");
+                        $stepID = null;
+                        $stepOrder = null;
+                    }
+                } else {
+                    error_log("WARNING: Submitted stepID {$submittedStepID} not found in policy {$policyID}. Will re-identify approver.");
+                    $stepID = null;
+                    $stepOrder = null;
                 }
             }
 
-            // If not found in saved approvers, check dynamic approvers
-            if (!$stepID && $employee && $allSteps && count($allSteps) > 0) {
+            // PRIORITY 2: If no submitted step info, check dynamic approvers FIRST, then static approvers
+            // This ensures dynamic workflows (supervisor, department_head, etc.) are processed first
+            if ((!$stepID || !$stepOrder)) {
+                // Get employee if not already retrieved
+                if (!$employee && $employeeID) {
+                    $employee = Employee::employees(array('ID' => $employeeID), true, $DBConn);
+                }
+
+                if ($employee) {
+                    $dynamicApprovers = array();
+                    $staticApprovers = array();
+
+                    // Step 1: Resolve dynamic approvers first
+                    $dynamicApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
+                    error_log("Resolved dynamic approvers for employee {$employeeID}: " . count($dynamicApprovers) . " approver(s)");
+
+                    // Verify dynamic approvers have stepID and stepOrder
+                    foreach ($dynamicApprovers as &$dynApprover) {
+                        if (!isset($dynApprover['stepID']) || !isset($dynApprover['stepOrder'])) {
+                            error_log("WARNING: Dynamic approver missing stepID or stepOrder: " . json_encode($dynApprover));
+                        }
+                    }
+                    unset($dynApprover);
+
+                    // Step 2: Check if user is in dynamic approvers list FIRST
+                    foreach ($dynamicApprovers as $approver) {
+                        if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID) {
+                            $approverStepID = isset($approver['stepID']) ? (int)$approver['stepID'] : null;
+                            $approverStepOrder = isset($approver['stepOrder']) ? (int)$approver['stepOrder'] : null;
+                            if ($approverStepID && $approverStepOrder) {
+                                $stepID = $approverStepID;
+                                $stepOrder = $approverStepOrder;
+                                error_log("Found approver in DYNAMIC list (PRIORITY): User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}");
+                                break;
+                            }
+                        }
+                    }
+
+                    // Step 3: Only check static approvers if not found in dynamic approvers
+                    if (!$stepID || !$stepOrder) {
+                        $staticApprovers = Leave::get_workflow_approvers($policyID, $DBConn);
+                        error_log("Checking static approvers (fallback): " . count($staticApprovers) . " approver(s)");
+
+                        foreach ($staticApprovers as $approver) {
+                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID) {
+                                $approverStepID = isset($approver['stepID']) ? (int)$approver['stepID'] : null;
+                                $approverStepOrder = isset($approver['stepOrder']) ? (int)$approver['stepOrder'] : null;
+                                if ($approverStepID && $approverStepOrder) {
+                                    $stepID = $approverStepID;
+                                    $stepOrder = $approverStepOrder;
+                                    error_log("Found approver in STATIC list (fallback): User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } // Close if ($employee) block
+            }
+
+            // PRIORITY 3: If still not found, check dynamic approver types by matching step types
+            // Don't restrict by currentStepOrder - check all steps to find the approver's step
+            if ((!$stepID || !$stepOrder) && $employee && $allSteps && count($allSteps) > 0) {
                 foreach ($allSteps as $step) {
                     $stepObj = is_object($step) ? $step : (object)$step;
                     $stepType = $stepObj->stepType ?? '';
                     $stepOrderVal = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
                     $stepIDVal = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
-
-                    // Only check steps that match current step order
-                    if ($stepOrderVal > $currentStepOrder) {
-                        continue; // Future steps
-                    }
 
                     // Check if user matches dynamic approver role
                     $isDynamicApprover = false;
@@ -221,7 +317,24 @@ try {
                     if ($isDynamicApprover && $stepIDVal) {
                         $stepID = $stepIDVal;
                         $stepOrder = $stepOrderVal;
-                        error_log("Dynamic approver matched: User {$userID} is {$stepType} for employee {$employeeID}, step {$stepID}, order {$stepOrder}");
+                        error_log("Dynamic approver matched by step type: User {$userID} is {$stepType} for employee {$employeeID}, step {$stepID}, order {$stepOrder}");
+                        break;
+                    }
+                }
+            }
+
+            // Final fallback: If still no stepID found but user is a direct report, find the first step with supervisor type
+            if (!$stepID && $employee && !empty($employee->supervisorID) && (int)$employee->supervisorID === $userID && $allSteps && count($allSteps) > 0) {
+                foreach ($allSteps as $step) {
+                    $stepObj = is_object($step) ? $step : (object)$step;
+                    $stepType = $stepObj->stepType ?? '';
+                    $stepOrderVal = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
+                    $stepIDVal = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
+
+                    if (($stepType === 'supervisor' || $stepType === 'project_manager') && $stepIDVal) {
+                        $stepID = $stepIDVal;
+                        $stepOrder = $stepOrderVal;
+                        error_log("Final fallback: Assigned supervisor step. User {$userID} is supervisor for employee {$employeeID}, step {$stepID}, order {$stepOrder}");
                         break;
                     }
                 }
@@ -278,37 +391,8 @@ try {
 
     try {
 
-        // Handle workflow actions
-        if ($hasWorkflow && $action === 'reject') {
-            // Immediate rejection - mark workflow as rejected and remove notifications
-            $columnsCheck = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances LIKE 'status'", array());
-            $hasStatusColumn = ($columnsCheck && count($columnsCheck) > 0);
-
-            $workflowColumnsCheck = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances LIKE 'workflowStatus'", array());
-            $hasWorkflowStatusColumn = ($workflowColumnsCheck && count($workflowColumnsCheck) > 0);
-
-            $updateData = array('completedAt' => $now);
-
-            if ($hasStatusColumn) {
-                $updateData['status'] = 'rejected';
-            }
-            if ($hasWorkflowStatusColumn) {
-                $updateData['workflowStatus'] = 'rejected';
-            }
-
-            $DBConn->update_table(
-                'tija_leave_approval_instances',
-                $updateData,
-                array('instanceID' => $instanceID)
-            );
-
-            // Remove pending notifications
-            LeaveNotifications::removePendingNotifications($leaveApplicationID, $DBConn);
-        }
-        // Note: Final approval workflow instance update is handled after determining newStatusID
-
-        // Record approval action in workflow if workflow exists
-        if ($hasWorkflow && $instanceID && $action === 'approve') {
+        // Handle workflow actions - Record both approve AND reject actions
+        if ($hasWorkflow && $instanceID) {
             // For HR managers not explicitly in workflow, use final step
             if ($isHrManager && !$stepID && $maxStepOrder > 0) {
                 // Find final step
@@ -325,8 +409,11 @@ try {
                 }
             }
 
+            // Record the action (both approve and reject)
+            // CRITICAL: Both stepID and stepOrder must be present for approval actions
             if ($stepID && $stepOrder) {
-                // Get approver ID from step approvers (or create a virtual one for dynamic approvers)
+                error_log("Processing approval action: User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}, Action: {$action}");
+                // Get approver ID from step approvers table
                 $stepApprovers = Leave::leave_approval_step_approvers(
                     array('stepID' => $stepID, 'approverUserID' => $userID, 'Suspended' => 'N'),
                     true,
@@ -339,135 +426,266 @@ try {
                     $stepApproverID = $approver['stepApproverID'] ?? $approver['approverID'] ?? null;
                 }
 
-                // For dynamic approvers (supervisor, department_head, etc.) or HR managers not in step approvers,
-                // use userID as stepApproverID
+                // For dynamic approvers (supervisor, department_head, hr_manager, etc.),
+                // ensure they are stored in tija_leave_approval_step_approvers table
                 if (!$stepApproverID) {
-                    $stepApproverID = $userID;
-                    error_log("Using userID as stepApproverID for dynamic approver: User {$userID}, Step {$stepID}");
+                    // Check table columns to determine the correct structure
+                    $allColumns = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_step_approvers", array());
+                    $columnNames = array();
+                    if ($allColumns && count($allColumns) > 0) {
+                        foreach ($allColumns as $col) {
+                            $col = is_object($col) ? (array)$col : $col;
+                            $columnNames[] = $col['Field'] ?? $col['field'] ?? '';
+                        }
+                    }
+
+                    $hasStepApproverID = in_array('stepApproverID', $columnNames);
+                    $hasApproverID = in_array('approverID', $columnNames);
+                    $hasApproverType = in_array('approverType', $columnNames);
+                    $hasIsBackup = in_array('isBackup', $columnNames);
+                    $hasCreatedAt = in_array('createdAt', $columnNames);
+
+                    // Determine step type for approverType
+                    $stepType = null;
+                    if ($allSteps && count($allSteps) > 0) {
+                        foreach ($allSteps as $step) {
+                            $stepObj = is_object($step) ? (array)$step : $step;
+                            if (isset($stepObj['stepID']) && (int)$stepObj['stepID'] === (int)$stepID) {
+                                $stepType = $stepObj['stepType'] ?? null;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Create approver record for dynamic approver
+                    $approverData = array(
+                        'stepID' => $stepID,
+                        'approverUserID' => $userID,
+                        'isBackup' => 'N',
+                        'notificationOrder' => 1,
+                        'Suspended' => 'N'
+                    );
+
+                    if ($hasApproverType) {
+                        $approverData['approverType'] = 'user';
+                    }
+
+                    if ($hasCreatedAt) {
+                        $approverData['createdAt'] = $now;
+                    }
+
+                    // Insert the dynamic approver record
+                    $insertResult = $DBConn->insert_data('tija_leave_approval_step_approvers', $approverData);
+
+                    if ($insertResult) {
+                        $stepApproverID = $DBConn->lastInsertId();
+                        error_log("Created approver record for dynamic approver: User {$userID}, Step {$stepID}, ApproverID: {$stepApproverID}, StepType: " . ($stepType ?? 'unknown'));
+                    } else {
+                        // If insert failed, try to use userID as fallback
+                        $stepApproverID = $userID;
+                        error_log("WARNING: Failed to create approver record for dynamic approver. Using userID as stepApproverID: User {$userID}, Step {$stepID}");
+                    }
                 }
 
                 if ($stepApproverID) {
-                    // Record the approval action
+                    // Validate that both stepID and stepOrder are present before recording
+                    if (!$stepID || !$stepOrder) {
+                        $errorMsg = "Cannot record approval action: Missing stepID or stepOrder. stepID: " . ($stepID ?? 'NULL') . ", stepOrder: " . ($stepOrder ?? 'NULL');
+                        error_log("ERROR: " . $errorMsg);
+                        throw new Exception($errorMsg);
+                    }
+
+                    // Record the action (approve or reject)
                     $actionID = LeaveNotifications::recordApprovalAction(
                         $instanceID,
-                        $stepID,
+                        (int)$stepID,
                         $stepApproverID,
                         $userID,
-                        $stepOrder,
+                        (int)$stepOrder,
                         $action,
                         $comments,
                         $DBConn
                     );
 
-                    error_log("Approval action recorded. ActionID: {$actionID}, InstanceID: {$instanceID}, StepID: {$stepID}, StepOrder: {$stepOrder}");
+                    error_log("Approval action recorded successfully. ActionID: {$actionID}, InstanceID: {$instanceID}, StepID: {$stepID}, StepOrder: {$stepOrder}, Action: {$action}, StepApproverID: {$stepApproverID}");
+                } else {
+                    error_log("WARNING: Could not determine stepApproverID for user {$userID}, step {$stepID}");
+                    throw new Exception("Could not determine approver ID for approval action");
+                }
+            } else {
+                $errorMsg = "Missing step information for approval action. stepID: " . ($stepID ?? 'NULL') . ", stepOrder: " . ($stepOrder ?? 'NULL') . ", UserID: {$userID}, LeaveApplicationID: {$leaveApplicationID}";
+                error_log("ERROR: " . $errorMsg);
 
-                    // Update workflow instance with last action info
-                    $instanceUpdateData = array('lastActionAt' => $now, 'lastActionBy' => $userID);
-
-                    // Check which columns exist
-                    $instanceColumns = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances", array());
-                    $instanceColumnNames = array();
-                    if ($instanceColumns && count($instanceColumns) > 0) {
-                        foreach ($instanceColumns as $col) {
-                            $col = is_object($col) ? (array)$col : $col;
-                            $instanceColumnNames[] = $col['Field'] ?? $col['field'] ?? '';
+                // Try one more time to resolve if we have employee info
+                if ($employee && !$stepID) {
+                    error_log("Attempting final resolution for employee {$employeeID}");
+                    $finalDynamicApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
+                    foreach ($finalDynamicApprovers as $finalApprover) {
+                        if (isset($finalApprover['approverUserID']) && (int)$finalApprover['approverUserID'] === $userID) {
+                            if (isset($finalApprover['stepID']) && isset($finalApprover['stepOrder'])) {
+                                $stepID = (int)$finalApprover['stepID'];
+                                $stepOrder = (int)$finalApprover['stepOrder'];
+                                error_log("Final resolution successful: StepID: {$stepID}, StepOrder: {$stepOrder}");
+                                break;
+                            }
                         }
                     }
+                }
 
-                    // For sequential workflows, advance to next step if current step is complete
-                    if ($approvalType === 'sequential' && $action === 'approve') {
-                        // Check if current step is fully approved
-                        $isStepComplete = Leave::is_step_fully_approved($instanceID, $stepID, $DBConn);
+                if (!$stepID || !$stepOrder) {
+                    throw new Exception($errorMsg);
+                }
+            }
 
-                        if ($isStepComplete && !$isFinalStep) {
-                            // Advance to next step
-                            $nextStepOrder = $stepOrder + 1;
-                            if ($nextStepOrder <= $maxStepOrder) {
-                                // Find next step ID
-                                $nextStepID = null;
-                                foreach ($allSteps as $step) {
-                                    $step = is_object($step) ? (array)$step : $step;
-                                    if (isset($step['stepOrder']) && (int)$step['stepOrder'] === $nextStepOrder) {
-                                        $nextStepID = isset($step['stepID']) ? (int)$step['stepID'] : null;
-                                        break;
+            // Handle rejection - mark workflow as rejected and remove notifications
+            if ($action === 'reject') {
+                $columnsCheck = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances LIKE 'status'", array());
+                $hasStatusColumn = ($columnsCheck && count($columnsCheck) > 0);
+
+                $workflowColumnsCheck = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances LIKE 'workflowStatus'", array());
+                $hasWorkflowStatusColumn = ($workflowColumnsCheck && count($workflowColumnsCheck) > 0);
+
+                $updateData = array('completedAt' => $now, 'lastActionAt' => $now, 'lastActionBy' => $userID);
+
+                if ($hasStatusColumn) {
+                    $updateData['status'] = 'rejected';
+                }
+                if ($hasWorkflowStatusColumn) {
+                    $updateData['workflowStatus'] = 'rejected';
+                }
+
+                $rejectionUpdateResult = $DBConn->update_table(
+                    'tija_leave_approval_instances',
+                    $updateData,
+                    array('instanceID' => $instanceID)
+                );
+
+                if ($rejectionUpdateResult) {
+                    error_log("Workflow instance updated for rejection. InstanceID: {$instanceID}, UpdateData: " . json_encode($updateData));
+                } else {
+                    error_log("WARNING: Failed to update workflow instance for rejection. InstanceID: {$instanceID}");
+                }
+
+                // Remove pending notifications
+                LeaveNotifications::removePendingNotifications($leaveApplicationID, $DBConn);
+                error_log("Workflow marked as rejected and notifications removed");
+            }
+        }
+        // Note: Final approval workflow instance update is handled after determining newStatusID
+
+        // Handle approval actions - workflow advancement
+        if ($hasWorkflow && $instanceID && $action === 'approve' && $stepID && $stepOrder) {
+            // Update workflow instance with last action info
+            $instanceUpdateData = array('lastActionAt' => $now, 'lastActionBy' => $userID);
+
+            // Check which columns exist
+            $instanceColumns = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances", array());
+            $instanceColumnNames = array();
+            if ($instanceColumns && count($instanceColumns) > 0) {
+                foreach ($instanceColumns as $col) {
+                    $col = is_object($col) ? (array)$col : $col;
+                    $instanceColumnNames[] = $col['Field'] ?? $col['field'] ?? '';
+                }
+            }
+
+            // For sequential workflows, advance to next step if current step is complete
+            if ($approvalType === 'sequential' && $action === 'approve') {
+                // Check if current step is fully approved
+                $isStepComplete = Leave::is_step_fully_approved($instanceID, $stepID, $DBConn);
+
+                if ($isStepComplete && !$isFinalStep) {
+                    // Advance to next step
+                    $nextStepOrder = $stepOrder + 1;
+                    if ($nextStepOrder <= $maxStepOrder) {
+                        // Find next step ID
+                        $nextStepID = null;
+                        foreach ($allSteps as $step) {
+                            $step = is_object($step) ? (array)$step : $step;
+                            if (isset($step['stepOrder']) && (int)$step['stepOrder'] === $nextStepOrder) {
+                                $nextStepID = isset($step['stepID']) ? (int)$step['stepID'] : null;
+                                break;
+                            }
+                        }
+
+                        if ($nextStepID) {
+                            $instanceUpdateData['currentStepOrder'] = $nextStepOrder;
+                            if (in_array('currentStepID', $instanceColumnNames)) {
+                                $instanceUpdateData['currentStepID'] = $nextStepID;
+                            }
+                            error_log("Workflow advancing to next step. New StepOrder: {$nextStepOrder}, StepID: {$nextStepID}");
+
+                            // Send notifications to next step approvers
+                            $nextStepApprovers = array();
+                            foreach ($allApprovers as $approver) {
+                                if (isset($approver['stepID']) && (int)$approver['stepID'] === $nextStepID) {
+                                    $nextStepApprovers[] = $approver;
+                                }
+                            }
+
+                            // If no saved approvers, resolve dynamic approvers
+                            if (empty($nextStepApprovers) && $employee) {
+                                $resolvedApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
+                                foreach ($resolvedApprovers as $resolved) {
+                                    if (isset($resolved['stepID']) && (int)$resolved['stepID'] === $nextStepID) {
+                                        $nextStepApprovers[] = $resolved;
                                     }
                                 }
+                            }
 
-                                if ($nextStepID) {
-                                    $instanceUpdateData['currentStepOrder'] = $nextStepOrder;
-                                    if (in_array('currentStepID', $instanceColumnNames)) {
-                                        $instanceUpdateData['currentStepID'] = $nextStepID;
-                                    }
-                                    error_log("Workflow advancing to next step. New StepOrder: {$nextStepOrder}, StepID: {$nextStepID}");
+                            // Send notifications to next step approvers
+                            if (!empty($nextStepApprovers)) {
+                                $employeeDetails = Employee::employees(array('ID' => $employeeID), true, $DBConn);
+                                $employeeName = $employeeDetails ? ($employeeDetails->FirstName . ' ' . $employeeDetails->Surname) : 'Employee';
+                                $leaveTypeObj = Leave::leave_types(array('leaveTypeID' => $leaveApplication->leaveTypeID), true, $DBConn);
 
-                                    // Send notifications to next step approvers
-                                    $nextStepApprovers = array();
-                                    foreach ($allApprovers as $approver) {
-                                        if (isset($approver['stepID']) && (int)$approver['stepID'] === $nextStepID) {
-                                            $nextStepApprovers[] = $approver;
-                                        }
-                                    }
+                                foreach ($nextStepApprovers as $nextApprover) {
+                                    $nextApproverUserID = isset($nextApprover['approverUserID']) ? (int)$nextApprover['approverUserID'] : null;
+                                    if ($nextApproverUserID) {
+                                        $nextStepNotification = Notification::create(array(
+                                            'eventSlug' => 'leave_pending_approval',
+                                            'userId' => $nextApproverUserID,
+                                            'originatorId' => $employeeID,
+                                            'data' => array(
+                                                'employee_id' => $employeeID,
+                                                'employee_name' => $employeeName,
+                                                'leave_type' => $leaveTypeObj ? $leaveTypeObj->leaveTypeName : 'Leave',
+                                                'start_date' => date('M j, Y', strtotime($leaveApplication->startDate)),
+                                                'end_date' => date('M j, Y', strtotime($leaveApplication->endDate)),
+                                                'total_days' => $leaveApplication->noOfDays ?? 0,
+                                                'application_id' => $leaveApplicationID,
+                                                'approval_level' => $nextStepOrder,
+                                                'step_name' => $nextApprover['stepName'] ?? 'Approval Step',
+                                                'is_final_step' => ($nextStepOrder >= $maxStepOrder)
+                                            ),
+                                            'link' => '?s=user&ss=leave&p=pending_approvals&id=' . $leaveApplicationID,
+                                            'entityID' => $entityID,
+                                            'orgDataID' => $leaveApplication->orgDataID ?? null,
+                                            'segmentType' => 'leave_application',
+                                            'segmentID' => $leaveApplicationID,
+                                            'priority' => 'high'
+                                        ), $DBConn);
 
-                                    // If no saved approvers, resolve dynamic approvers
-                                    if (empty($nextStepApprovers) && $employee) {
-                                        $resolvedApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
-                                        foreach ($resolvedApprovers as $resolved) {
-                                            if (isset($resolved['stepID']) && (int)$resolved['stepID'] === $nextStepID) {
-                                                $nextStepApprovers[] = $resolved;
-                                            }
-                                        }
-                                    }
-
-                                    // Send notifications to next step approvers
-                                    if (!empty($nextStepApprovers)) {
-                                        $employeeDetails = Employee::employees(array('ID' => $employeeID), true, $DBConn);
-                                        $employeeName = $employeeDetails ? ($employeeDetails->FirstName . ' ' . $employeeDetails->Surname) : 'Employee';
-                                        $leaveTypeObj = Leave::leave_types(array('leaveTypeID' => $leaveApplication->leaveTypeID), true, $DBConn);
-
-                                        foreach ($nextStepApprovers as $nextApprover) {
-                                            $nextApproverUserID = isset($nextApprover['approverUserID']) ? (int)$nextApprover['approverUserID'] : null;
-                                            if ($nextApproverUserID) {
-                                                Notification::create(array(
-                                                    'eventSlug' => 'leave_pending_approval',
-                                                    'userId' => $nextApproverUserID,
-                                                    'originatorId' => $employeeID,
-                                                    'data' => array(
-                                                        'employee_id' => $employeeID,
-                                                        'employee_name' => $employeeName,
-                                                        'leave_type' => $leaveTypeObj ? $leaveTypeObj->leaveTypeName : 'Leave',
-                                                        'start_date' => date('M j, Y', strtotime($leaveApplication->startDate)),
-                                                        'end_date' => date('M j, Y', strtotime($leaveApplication->endDate)),
-                                                        'total_days' => $leaveApplication->noOfDays ?? 0,
-                                                        'application_id' => $leaveApplicationID,
-                                                        'approval_level' => $nextStepOrder,
-                                                        'step_name' => $nextApprover['stepName'] ?? 'Approval Step',
-                                                        'is_final_step' => ($nextStepOrder >= $maxStepOrder)
-                                                    ),
-                                                    'link' => '?s=user&ss=leave&p=pending_approvals&id=' . $leaveApplicationID,
-                                                    'entityID' => $entityID,
-                                                    'orgDataID' => $leaveApplication->orgDataID ?? null,
-                                                    'segmentType' => 'leave_application',
-                                                    'segmentID' => $leaveApplicationID,
-                                                    'priority' => 'high'
-                                                ), $DBConn);
-                                            }
+                                        if (is_array($nextStepNotification) && isset($nextStepNotification['success']) && $nextStepNotification['success']) {
+                                            error_log("Notification sent to next step approver. UserID: {$nextApproverUserID}, StepOrder: {$nextStepOrder}, LeaveApplicationID: {$leaveApplicationID}");
+                                        } else {
+                                            error_log("WARNING: Failed to send notification to next step approver. UserID: {$nextApproverUserID}, StepOrder: {$nextStepOrder}, LeaveApplicationID: {$leaveApplicationID}");
                                         }
                                     }
                                 }
                             }
                         }
                     }
-
-                    // Update workflow instance
-                    if (!empty($instanceUpdateData)) {
-                        LeaveNotifications::updateApprovalInstance($instanceID, $instanceUpdateData, $DBConn);
-                        error_log("Workflow instance updated: " . json_encode($instanceUpdateData));
-                    }
-                } else {
-                    error_log("WARNING: Could not determine stepApproverID for user {$userID}, step {$stepID}");
                 }
-            } else {
-                error_log("WARNING: stepID or stepOrder is missing. stepID: " . ($stepID ?? 'NULL') . ", stepOrder: " . ($stepOrder ?? 'NULL'));
+            }
+
+            // Update workflow instance
+            if (!empty($instanceUpdateData)) {
+                $instanceUpdateResult = LeaveNotifications::updateApprovalInstance($instanceID, $instanceUpdateData, $DBConn);
+                if ($instanceUpdateResult) {
+                    error_log("Workflow instance updated successfully. InstanceID: {$instanceID}, UpdateData: " . json_encode($instanceUpdateData));
+                } else {
+                    error_log("WARNING: Failed to update workflow instance. InstanceID: {$instanceID}, UpdateData: " . json_encode($instanceUpdateData));
+                }
             }
         }
 
@@ -504,8 +722,12 @@ try {
                     $finalUpdateData['workflowStatus'] = 'completed';
                 }
 
-                LeaveNotifications::updateApprovalInstance($instanceID, $finalUpdateData, $DBConn);
-                error_log("Workflow instance marked as completed");
+                $finalUpdateResult = LeaveNotifications::updateApprovalInstance($instanceID, $finalUpdateData, $DBConn);
+                if ($finalUpdateResult) {
+                    error_log("Workflow instance marked as completed. InstanceID: {$instanceID}, UpdateData: " . json_encode($finalUpdateData));
+                } else {
+                    error_log("WARNING: Failed to update workflow instance as completed. InstanceID: {$instanceID}");
+                }
             }
         } elseif ($action === 'approve' && $isFinalStep && !$hasWorkflow) {
             $newStatusID = 6; // Fully approved (no workflow)
@@ -535,23 +757,46 @@ try {
             }
         }
 
-        // Record approval in legacy table
+        // Record approval in legacy table (tija_leave_approvals)
         Leave::ensure_leave_approval_comments_table($DBConn);
-        $DBConn->insert_data('tija_leave_approvals', array(
+
+        // Prepare data for legacy approvals table
+        $legacyApprovalData = array(
             'leaveApplicationID' => $leaveApplicationID,
             'employeeID' => $leaveApplication->employeeID ?? null,
             'leaveTypeID' => $leaveApplication->leaveTypeID ?? null,
             'leavePeriodID' => $leaveApplication->leavePeriodID ?? null,
             'leaveApproverID' => $userID,
-            'leaveDate' => $now,
+            'leaveDate' => date('Y-m-d'), // Date only, not datetime
             'leaveStatusID' => $newStatusID,
-            'leaveStatus' => $action === 'approve' ? ($newStatusID === 6 ? 'approved' : 'pending') : 'rejected',
-            'approversComments' => $comments,
+            'leaveStatus' => $action === 'approve' ? ($newStatusID === 6 ? 'approved' : 'approved') : 'rejected',
+            'approversComments' => ($comments && $comments !== '') ? $comments : '', // Ensure not null
             'LastUpdateByID' => $userID,
             'LastUpdate' => $now,
             'Lapsed' => 'N',
             'Suspended' => 'N'
-        ));
+        );
+
+        // Check if DateAdded column exists and add it
+        $approvalColumns = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approvals", array());
+        $approvalColumnNames = array();
+        if ($approvalColumns && count($approvalColumns) > 0) {
+            foreach ($approvalColumns as $col) {
+                $col = is_object($col) ? (array)$col : $col;
+                $approvalColumnNames[] = $col['Field'] ?? $col['field'] ?? '';
+            }
+        }
+
+        if (in_array('DateAdded', $approvalColumnNames) && !isset($legacyApprovalData['DateAdded'])) {
+            $legacyApprovalData['DateAdded'] = $now;
+        }
+
+        $legacyApprovalResult = $DBConn->insert_data('tija_leave_approvals', $legacyApprovalData);
+        if (!$legacyApprovalResult) {
+            error_log("WARNING: Failed to insert into legacy approvals table, but continuing...");
+        } else {
+            error_log("Legacy approval record created. LeaveApprovalID: " . $DBConn->lastInsertId() . ", LeaveApplicationID: {$leaveApplicationID}, ApproverID: {$userID}");
+        }
 
         // Save comment if provided
         if (!empty($comments)) {
@@ -569,36 +814,87 @@ try {
             ));
         }
 
-        // Record audit trail
+        // Record audit trail with comprehensive information
+        $auditOldValues = array(
+            'leaveStatusID' => (int)$leaveApplication->leaveStatusID,
+            'instanceID' => $instanceID,
+            'currentStepOrder' => isset($instance) && isset($instance['currentStepOrder']) ? (int)$instance['currentStepOrder'] : null
+        );
+
+        $auditNewValues = array(
+            'leaveStatusID' => $newStatusID,
+            'instanceID' => $instanceID
+        );
+
+        if ($hasWorkflow && $instanceID) {
+            $auditNewValues['stepID'] = $stepID;
+            $auditNewValues['stepOrder'] = $stepOrder;
+            $auditNewValues['stepApproverID'] = $stepApproverID ?? null;
+            $auditNewValues['isFinalStep'] = $isFinalStep;
+            if (isset($instanceUpdateData['currentStepOrder'])) {
+                $auditNewValues['currentStepOrder'] = $instanceUpdateData['currentStepOrder'];
+            }
+        }
+
         $auditData = array(
             'entityType' => 'approval',
             'entityID' => $leaveApplicationID,
             'action' => $action === 'approve' ? ($isFinalStep ? 'approved' : 'approved_step') : 'rejected',
-            'oldValues' => json_encode(array(
-                'leaveStatusID' => (int)$leaveApplication->leaveStatusID
-            )),
-            'newValues' => json_encode(array(
-                'leaveStatusID' => $newStatusID
-            )),
+            'oldValues' => json_encode($auditOldValues),
+            'newValues' => json_encode($auditNewValues),
             'performedByID' => $userID,
-            'performedDate' => 'now()',
-            'reason' => ($comments && $comments !== '') ? $comments : 'NULL'
+            'performedDate' => $now,
+            'reason' => ($comments && $comments !== '') ? $comments : null
         );
+
+        // Check if ipAddress and userAgent columns exist
+        $auditColumns = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_audit_log", array());
+        $auditColumnNames = array();
+        if ($auditColumns && count($auditColumns) > 0) {
+            foreach ($auditColumns as $col) {
+                $col = is_object($col) ? (array)$col : $col;
+                $auditColumnNames[] = $col['Field'] ?? $col['field'] ?? '';
+            }
+        }
+
+        if (in_array('ipAddress', $auditColumnNames)) {
+            $auditData['ipAddress'] = $_SERVER['REMOTE_ADDR'] ?? null;
+        }
+        if (in_array('userAgent', $auditColumnNames)) {
+            $auditData['userAgent'] = $_SERVER['HTTP_USER_AGENT'] ?? null;
+        }
 
         $auditResult = $DBConn->insert_data('tija_leave_audit_log', $auditData);
         if (!$auditResult) {
             throw new Exception('Failed to log approval action');
         }
 
+        error_log("Audit log entry created. AuditID: " . $DBConn->lastInsertId() . ", Action: {$auditData['action']}, InstanceID: {$instanceID}, StepID: " . ($stepID ?? 'NULL'));
+
         $DBConn->commit();
 
-        // Send notifications
-        if ($action === 'approve') {
-            // Notify applicant of approval
-            LeaveNotifications::notifyLeaveApproved($leaveApplicationID, $userID, $stepID ?? 0, $isFinalStep, $comments, $DBConn);
-        } else {
-            // Rejection - notify applicant (pending notifications already removed above)
-            LeaveNotifications::notifyLeaveRejected($leaveApplicationID, $userID, $comments, $DBConn);
+        // Send notifications after successful commit
+        try {
+            if ($action === 'approve') {
+                // Notify applicant of approval
+                $notifyResult = LeaveNotifications::notifyLeaveApproved($leaveApplicationID, $userID, $stepID ?? 0, $isFinalStep, $comments, $DBConn);
+                if (isset($notifyResult['success']) && $notifyResult['success']) {
+                    error_log("Approval notification sent successfully. LeaveApplicationID: {$leaveApplicationID}, ApproverID: {$userID}, IsFinalStep: " . ($isFinalStep ? 'YES' : 'NO'));
+                } else {
+                    error_log("WARNING: Approval notification may have failed. LeaveApplicationID: {$leaveApplicationID}, Result: " . json_encode($notifyResult));
+                }
+            } else {
+                // Rejection - notify applicant (pending notifications already removed above)
+                $notifyResult = LeaveNotifications::notifyLeaveRejected($leaveApplicationID, $userID, $comments, $DBConn);
+                if (isset($notifyResult['success']) && $notifyResult['success']) {
+                    error_log("Rejection notification sent successfully. LeaveApplicationID: {$leaveApplicationID}, ApproverID: {$userID}");
+                } else {
+                    error_log("WARNING: Rejection notification may have failed. LeaveApplicationID: {$leaveApplicationID}, Result: " . json_encode($notifyResult));
+                }
+            }
+        } catch (Exception $notifyException) {
+            // Log notification errors but don't fail the approval action
+            error_log("ERROR: Exception while sending notifications: " . $notifyException->getMessage());
         }
 
         $message = $action === 'approve'

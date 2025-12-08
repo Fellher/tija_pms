@@ -170,7 +170,64 @@ class Notification {
             $notifications = array();
             $success = true;
 
-            // Create notification for each channel
+            // Create a single in-app notification record (will be used for all channels)
+            $sharedNotificationID = null;
+            $inAppChannel = self::getChannelBySlug('in_app', $DBConn);
+            $inAppChannelID = $inAppChannel ? $inAppChannel['channelID'] : null;
+
+            // Get the in-app template to create the initial notification record
+            $inAppTemplate = null;
+            if ($inAppChannelID) {
+                $inAppTemplate = self::getTemplate($event['eventID'], $inAppChannelID, $params, $DBConn);
+            }
+
+            // Render the in-app template
+            if ($inAppTemplate) {
+                $inAppRendered = self::renderTemplate($inAppTemplate, $params['data']);
+
+                // Create the shared notification record
+                $priority = isset($params['priority']) ? $params['priority'] : $event['priorityLevel'];
+                $link = isset($params['link']) ? $params['link'] : null;
+
+                $sharedNotificationID = self::createInAppNotification(array(
+                    'eventID' => $event['eventID'],
+                    'userID' => $params['userId'],
+                    'originatorUserID' => isset($params['originatorId']) ? $params['originatorId'] : null,
+                    'entityID' => isset($params['entityID']) ? $params['entityID'] : null,
+                    'orgDataID' => isset($params['orgDataID']) ? $params['orgDataID'] : null,
+                    'segmentType' => isset($params['segmentType']) ? $params['segmentType'] : null,
+                    'segmentID' => isset($params['segmentID']) ? $params['segmentID'] : null,
+                    'notificationTitle' => $inAppRendered['subject'],
+                    'notificationBody' => $inAppRendered['body'],
+                    'notificationData' => json_encode($params['data']),
+                    'notificationLink' => $link,
+                    'notificationIcon' => $event['moduleIcon'] ?? 'ri-notification-line',
+                    'priority' => $priority
+                ), $DBConn);
+
+                if ($sharedNotificationID) {
+                    error_log("Notification::create - SUCCESS: Shared notification record created with ID: {$sharedNotificationID}");
+
+                    // Log the creation
+                    try {
+                        self::logAction(array(
+                            'notificationID' => $sharedNotificationID,
+                            'eventID' => $event['eventID'],
+                            'channelID' => $inAppChannelID,
+                            'userID' => $params['userId'],
+                            'action' => 'created',
+                            'actionDetails' => 'Shared notification record created'
+                        ), $DBConn);
+                    } catch (Exception $logError) {
+                        error_log("Notification::create - WARNING: Failed to log action: " . $logError->getMessage());
+                    }
+                } else {
+                    error_log("Notification::create - ERROR: Failed to create shared notification record.");
+                    $success = false;
+                }
+            }
+
+            // Process each channel using the shared notification ID
             foreach ($channels as $channelID) {
                 // Get or use channel ID
                 if (is_array($channelID)) {
@@ -192,9 +249,8 @@ class Notification {
                     // For email channel, use in-app template as fallback
                     if ($channel && $channel['channelSlug'] === 'email') {
                         error_log("Notification::create - INFO: Email template missing, using in-app template as fallback");
-                        $inAppChannel = self::getChannelBySlug('in_app', $DBConn);
-                        if ($inAppChannel) {
-                            $template = self::getTemplate($event['eventID'], $inAppChannel['channelID'], $params, $DBConn);
+                        if ($inAppChannelID) {
+                            $template = self::getTemplate($event['eventID'], $inAppChannelID, $params, $DBConn);
                             if ($template) {
                                 error_log("Notification::create - Using in-app template (ID: {$template['templateID']}) as fallback for email");
                             }
@@ -229,11 +285,11 @@ class Notification {
                 // Build notification link
                 $link = isset($params['link']) ? $params['link'] : null;
 
-                // Channel details already retrieved above
+                // Use shared notification ID or create new one if not available
+                $notifID = $sharedNotificationID;
 
-                // Create notification record
-                if ($channel && $channel['channelSlug'] === 'in_app') {
-                    // In-app notification - store in main table
+                // If no shared ID (shouldn't happen), create one for this channel
+                if (!$notifID) {
                     $notifID = self::createInAppNotification(array(
                         'eventID' => $event['eventID'],
                         'userID' => $params['userId'],
@@ -250,45 +306,20 @@ class Notification {
                         'priority' => $priority
                     ), $DBConn);
 
-                    if ($notifID) {
-                        error_log("Notification::create - SUCCESS: In-app notification created with ID: {$notifID}");
-                        $notifications[] = array('channelSlug' => 'in_app', 'notificationID' => $notifID);
-
-                        // Log the creation
-                        try {
-                            self::logAction(array(
-                                'notificationID' => $notifID,
-                                'eventID' => $event['eventID'],
-                                'channelID' => $channelID,
-                                'userID' => $params['userId'],
-                                'action' => 'created',
-                                'actionDetails' => 'In-app notification created'
-                            ), $DBConn);
-                        } catch (Exception $logError) {
-                            error_log("Notification::create - WARNING: Failed to log action: " . $logError->getMessage());
-                        }
-                    } else {
-                        error_log("Notification::create - ERROR: Failed to create in-app notification. createInAppNotification returned false.");
+                    if (!$notifID) {
+                        error_log("Notification::create - ERROR: Failed to create notification record for channel {$channelSlug}");
                         $success = false;
+                        continue;
                     }
-                } else {
-                    // Email/SMS/Push - create notification record first
-                    $notifID = self::createInAppNotification(array(
-                        'eventID' => $event['eventID'],
-                        'userID' => $params['userId'],
-                        'originatorUserID' => isset($params['originatorId']) ? $params['originatorId'] : null,
-                        'entityID' => isset($params['entityID']) ? $params['entityID'] : null,
-                        'orgDataID' => isset($params['orgDataID']) ? $params['orgDataID'] : null,
-                        'segmentType' => isset($params['segmentType']) ? $params['segmentType'] : null,
-                        'segmentID' => isset($params['segmentID']) ? $params['segmentID'] : null,
-                        'notificationTitle' => $rendered['subject'],
-                        'notificationBody' => $rendered['body'],
-                        'notificationData' => json_encode($params['data']),
-                        'notificationLink' => $link,
-                        'notificationIcon' => $event['moduleIcon'] ?? 'ri-notification-line',
-                        'priority' => $priority
-                    ), $DBConn);
+                }
 
+                // Process based on channel type
+                if ($channel && $channel['channelSlug'] === 'in_app') {
+                    // In-app notification - already created above
+                    $notifications[] = array('channelSlug' => 'in_app', 'notificationID' => $notifID);
+                    error_log("Notification::create - In-app notification registered with ID: {$notifID}");
+                } else {
+                    // Email/SMS/Push - use the shared notification ID and queue delivery
                     if ($notifID) {
                         // Get user contact info from people table
                         error_log("Notification::create - ===== RETRIEVING APPROVER/USER EMAIL FROM PEOPLE TABLE =====");

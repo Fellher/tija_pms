@@ -190,6 +190,7 @@ function getStatusBadgeClass($statusID) {
                                 <th scope="col">Dates</th>
                                 <th scope="col">Days</th>
                                 <th scope="col">Status</th>
+                                <th scope="col">Approval Progress</th>
                                 <th scope="col">Last Updated</th>
                                 <th scope="col" class="text-end">Action</th>
                             </tr>
@@ -207,6 +208,9 @@ function getStatusBadgeClass($statusID) {
                                     $statusName = $app['leaveStatusName'] ?? ($statusLookup[$statusID] ?? 'Unknown');
                                     $lastUpdateRaw = $app['LastUpdate'] ?? $app['DateAdded'] ?? null;
                                     $updated = $lastUpdateRaw ? date('M j, Y g:i a', strtotime($lastUpdateRaw)) : null;
+
+                                    // Get workflow status summary
+                                    $workflowSummary = Leave::get_leave_workflow_summary($leaveID, $DBConn);
                                 ?>
                                 <tr>
                                     <td>#<?php echo htmlspecialchars($leaveID); ?></td>
@@ -223,6 +227,29 @@ function getStatusBadgeClass($statusID) {
                                         <span class="badge <?php echo getStatusBadgeClass($statusID); ?>">
                                             <?php echo htmlspecialchars($statusName); ?>
                                         </span>
+                                    </td>
+                                    <td>
+                                        <?php if ($workflowSummary): ?>
+                                            <div class="small">
+                                                <?php if ($workflowSummary['approvedCount'] > 0): ?>
+                                                    <span class="badge bg-success" title="<?php echo htmlspecialchars($workflowSummary['approvedBy']); ?>">
+                                                        <i class="ri-check-line"></i> <?php echo $workflowSummary['approvedCount']; ?> Approved
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if ($workflowSummary['rejectedCount'] > 0): ?>
+                                                    <span class="badge bg-danger" title="<?php echo htmlspecialchars($workflowSummary['rejectedBy']); ?>">
+                                                        <i class="ri-close-line"></i> <?php echo $workflowSummary['rejectedCount']; ?> Rejected
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if ($workflowSummary['pendingCount'] > 0): ?>
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="ri-time-line"></i> <?php echo $workflowSummary['pendingCount']; ?> Pending
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted small">—</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?php echo $updated ? htmlspecialchars($updated) : '-'; ?></td>
                                     <td class="text-end">

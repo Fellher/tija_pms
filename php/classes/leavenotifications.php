@@ -702,6 +702,7 @@ class LeaveNotifications {
         $actionData = array(
             'instanceID' => $instanceID,
             'stepID' => $stepID,
+            'stepOrder' => $stepOrder,
             'approverID' => $stepApproverID,
             'approverUserID' => $approverUserID,
             'action' => $actionStatus

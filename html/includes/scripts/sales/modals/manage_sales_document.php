@@ -25,6 +25,8 @@ $documentCategories = array(
    <input type="hidden" name="salesCaseID" id="documentSalesCaseID" value="<?= $salesCaseDetails->salesCaseID ?? '' ?>">
    <input type="hidden" name="documentID" id="documentID" value="">
    <input type="hidden" name="action" id="documentAction" value="upload">
+   <input type="hidden" name="salesStage" id="documentSalesStage" value="<?= $salesCaseDetails->saleStage ?? '' ?>">
+   <input type="hidden" name="saleStatusLevelID" id="documentSaleStatusLevelID" value="<?= $salesCaseDetails->saleStatusLevelID ?? '' ?>">
 
       <!-- Document Name -->
       <div class="form-group mb-3">
@@ -64,6 +66,43 @@ $documentCategories = array(
          <small class="text-muted">Optional: Specify document type or version</small>
       </div>
 
+      <!-- Document Stage -->
+      <div class="form-group mb-3">
+         <label for="documentStage" class="form-label fw-semibold">Document Stage</label>
+         <select class="form-select" id="documentStage" name="documentStage">
+            <option value="">Not specified</option>
+            <option value="draft">Draft</option>
+            <option value="revision">Under Revision</option>
+            <option value="final">Final Version</option>
+            <option value="approved">Approved</option>
+            <option value="signed">Signed</option>
+         </select>
+         <small class="text-muted">Maturity stage of this document</small>
+      </div>
+
+      <!-- Sales Stage Display (Read-only) -->
+      <div class="form-group mb-3">
+         <label class="form-label fw-semibold">
+            <i class="ri-flag-line me-1"></i>Current Sales Stage
+         </label>
+         <div class="card bg-light border-0">
+            <div class="card-body py-2">
+               <div class="d-flex align-items-center">
+                  <span class="badge <?=
+                     $salesCaseDetails->saleStage === 'Lead' ? 'bg-info' :
+                     ($salesCaseDetails->saleStage === 'Opportunity' ? 'bg-primary' :
+                     ($salesCaseDetails->saleStage === 'Proposal' ? 'bg-warning' : 'bg-success'))
+                  ?> me-2">
+                     <?= htmlspecialchars($salesCaseDetails->saleStage ?? 'Unknown') ?>
+                  </span>
+                  <small class="text-muted">
+                     Document will be tagged with this stage for tracking
+                  </small>
+               </div>
+            </div>
+         </div>
+      </div>
+
       <!-- File Upload -->
       <div class="form-group mb-3">
          <label for="documentFile" class="form-label fw-semibold">
@@ -99,6 +138,28 @@ $documentCategories = array(
                    placeholder="Optional description or notes about this document"></textarea>
       </div>
 
+      <!-- Tags -->
+      <div class="form-group mb-3">
+         <label for="documentTags" class="form-label fw-semibold">Tags</label>
+         <input type="text"
+                class="form-control"
+                id="documentTags"
+                name="tags"
+                placeholder="e.g., contract, pricing, terms, final">
+         <small class="text-muted">Comma-separated tags for easy searching (e.g., contract, pricing, final)</small>
+      </div>
+
+      <!-- Expiry Date (for time-sensitive documents) -->
+      <div class="form-group mb-3">
+         <label for="documentExpiryDate" class="form-label fw-semibold">Expiry Date (Optional)</label>
+         <input type="text"
+                class="form-control"
+                id="documentExpiryDate"
+                name="expiryDate"
+                placeholder="Select expiry date">
+         <small class="text-muted">For proposals, quotes, or time-sensitive documents</small>
+      </div>
+
       <!-- Options Row -->
       <div class="row g-3 mb-3">
          <!-- Confidential -->
@@ -127,6 +188,56 @@ $documentCategories = array(
                   <i class="ri-eye-line me-1"></i>Visible to Client
                </label>
             </div>
+         </div>
+      </div>
+
+      <!-- Shared with Client Section -->
+      <div class="row g-3 mb-3">
+         <div class="col-md-6">
+            <div class="form-check form-switch">
+               <input class="form-check-input"
+                      type="checkbox"
+                      id="sharedWithClient"
+                      name="sharedWithClient"
+                      value="Y">
+               <label class="form-check-label" for="sharedWithClient">
+                  <i class="ri-share-line me-1"></i>Already Shared with Client
+               </label>
+            </div>
+         </div>
+         <div class="col-md-6" id="sharedDateField" style="display: none;">
+            <label for="documentSharedDate" class="form-label small mb-1">Shared Date</label>
+            <input type="text"
+                   class="form-control form-control-sm"
+                   id="documentSharedDate"
+                   name="sharedDate"
+                   placeholder="Select date">
+         </div>
+      </div>
+
+      <!-- Version Information -->
+      <div class="row g-3 mb-3">
+         <div class="col-md-6">
+            <label for="documentVersion" class="form-label fw-semibold">Version</label>
+            <input type="text"
+                   class="form-control"
+                   id="documentVersion"
+                   name="version"
+                   placeholder="e.g., 1.0, 2.1, Final"
+                   value="1.0">
+            <small class="text-muted">Document version number</small>
+         </div>
+         <div class="col-md-6">
+            <label for="linkedActivityID" class="form-label fw-semibold">Link to Activity</label>
+            <select class="form-select" id="linkedActivityID" name="linkedActivityID">
+               <option value="">Not linked</option>
+               <?php if(isset($activities) && $activities): ?>
+                  <?php foreach($activities as $activity): ?>
+                     <option value="<?= $activity->activityID ?>"><?= htmlspecialchars($activity->activityName) ?> (<?= Utility::date_format($activity->activityDate) ?>)</option>
+                  <?php endforeach; ?>
+               <?php endif; ?>
+            </select>
+            <small class="text-muted">Activity where document was created</small>
          </div>
 
          <!-- Requires Approval -->
@@ -359,6 +470,51 @@ $documentCategories = array(
       return false;
    };
 
+   // Initialize Date Pickers
+   function initializeDocumentDatePickers() {
+      if (typeof flatpickr === 'undefined') {
+         console.warn('Flatpickr not loaded. Retrying...');
+         setTimeout(initializeDocumentDatePickers, 100);
+         return;
+      }
+
+      // Expiry Date Picker
+      const expiryDateInput = document.getElementById('documentExpiryDate');
+      if (expiryDateInput && !expiryDateInput._flatpickr) {
+         flatpickr(expiryDateInput, {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'F j, Y',
+            allowInput: true,
+            minDate: 'today'
+         });
+      }
+
+      // Shared Date Picker
+      const sharedDateInput = document.getElementById('documentSharedDate');
+      if (sharedDateInput && !sharedDateInput._flatpickr) {
+         flatpickr(sharedDateInput, {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'F j, Y',
+            allowInput: true,
+            maxDate: 'today'
+         });
+      }
+   }
+
+   // Handle shared with client checkbox
+   function initializeConditionalFields() {
+      const sharedCheckbox = document.getElementById('sharedWithClient');
+      const sharedDateField = document.getElementById('sharedDateField');
+
+      if (sharedCheckbox && sharedDateField) {
+         sharedCheckbox.addEventListener('change', function() {
+            sharedDateField.style.display = this.checked ? 'block' : 'none';
+         });
+      }
+   }
+
    // Initialize handlers when modal is shown
    const modalElement = document.getElementById('manageSalesDocumentModal');
    if (modalElement) {
@@ -396,6 +552,12 @@ $documentCategories = array(
          } else {
             console.error('Submit button not found');
          }
+
+         // Initialize date pickers and conditional fields
+         setTimeout(() => {
+            initializeDocumentDatePickers();
+            initializeConditionalFields();
+         }, 100);
       });
    }
 

@@ -398,9 +398,23 @@
                                             <img src="<?php echo "{$config['DataDir']}{$userDetails->profile_image}" ?>" alt="img" width="30" height="30" class="rounded-circle">
 
                                             <?php
-                                        } else {?>
-                                            <img src="<?php echo $base ?>assets/img/users/8.jpg" alt="img" width="30" height="30" class="rounded-circle">
-                                            <?php
+                                        } else {
+                                            // Try to get or generate initials
+                                            $initials = '';
+                                            if($userDetails && isset($userDetails->userInitials) && !empty($userDetails->userInitials)) {
+                                                $initials = strtoupper($userDetails->userInitials);
+                                            } elseif($userDetails && (isset($userDetails->FirstName) || isset($userDetails->Surname))) {
+                                                $initials = Core::user_name_initials($userDetails);
+                                            }
+                                            if($initials) {?>
+                                                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; font-size: 12px; font-weight: 600;">
+                                                    <span><?php echo htmlspecialchars($initials); ?></span>
+                                                </div>
+                                                <?php
+                                            } else {?>
+                                                <img src="<?php echo $base ?>assets/img/users/8.jpg" alt="img" width="30" height="30" class="rounded-circle">
+                                                <?php
+                                            }
                                         }?>
                                     <!-- <img src="<?php echo $base ?>assets/img/users/1.jpg" alt="img" width="30" height="30" class="rounded-circle"> -->
                                 </div>
@@ -415,9 +429,22 @@
                                         if($userDetails && $userDetails->profile_image) {?>
                                             <img src="<?php echo "{$config['DataDir']}{$userDetails->profile_image}" ?>" alt="img" class="rounded-circle">
                                             <?php
-                                        } else {?>
-                                            <img src="<?php echo $base ?>assets/img/users/8.jpg" alt="img" class="rounded-circle">
-                                            <?php
+                                        } else {
+                                            // Try to get or generate initials
+                                            $initials = '';
+                                            if($userDetails && isset($userDetails->userInitials) && !empty($userDetails->userInitials)) {
+                                                $initials = strtoupper($userDetails->userInitials);
+                                            } elseif($userDetails && (isset($userDetails->FirstName) || isset($userDetails->Surname))) {
+                                                $initials = Core::user_name_initials($userDetails);
+                                            }
+
+                                            if($initials) {?>
+                                                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="font-weight: 600;">
+                                                    <span><?php echo htmlspecialchars($initials); ?></span>
+                                                </div>
+                                            <?php } else {?>
+                                                <img src="<?php echo $base ?>assets/img/users/8.jpg" alt="img" class="rounded-circle">
+                                            <?php }
                                         }
 
                                         ?>

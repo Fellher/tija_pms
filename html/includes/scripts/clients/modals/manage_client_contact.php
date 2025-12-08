@@ -1,7 +1,7 @@
 <div class="editContactPersonForm" id="editContactPersonForm">
-	<input type="hidden" name="userID" value="<?php echo $userDetails->ID; ?>">
-	<input type="hidden" name="clientID" value="<?php echo $clientID ?>">
-	<input type="hidden" name="clientContactID" value="">
+	<input type="hidden" name="userID" id="userID" value="<?php echo $userDetails->ID; ?>">
+	<input type="hidden" name="clientID" id="clientID" value="<?= isset($clientID) ? $clientID : (isset($clientDetails) ? $clientDetails->clientID : '') ?>">
+	<input type="hidden" name="clientContactID" id="clientContactID" value="">
 	<fieldset class="col-md-12 ">
 		<div class=" pt-0">
 			<legend class="fs-18 bg-light-blue px-2 my-2">Personal Information</legend>
@@ -22,13 +22,13 @@
 				</div>
 
 				<div class="form-group col-md-6">
-					<label class="nott mb-0 t500 text-primary">Salutation</label>				  			
+					<label class="nott mb-0 t500 text-primary">Salutation</label>
 					<select class="form-control form-control-xs form-control-plaintext border bg-light" name="salutationID">
 						<?php echo Form::populate_select_element_from_object($prefixes, 'prefixID', 'prefixName', "", '', 'Select salutation')  ?>
 					</select>
 				</div>
 			</div>
-		</div>	
+		</div>
 	</fieldset>
 
 	<fieldset class="col-md-12">
@@ -45,22 +45,22 @@
 					<input type="text" name="telephone" class="form-control form-control-xs form-control-plaintext bg-light border-bottom ps-2" placeholder="+254 00 000 0000" value="">
 				</div>
 
-				
+
 
 				<div class="form-group col-md-6">
-					<label class="nott mb-0 t500 text-primary">Address</label>				  			
-					<select class="form-control form-control-xs form-control-plaintext border-bottom bg-light pl-2" name="clientAddressID" id="clientAddressID">  
+					<label class="nott mb-0 t500 text-primary">Address</label>
+					<select class="form-control form-control-xs form-control-plaintext border-bottom bg-light pl-2" name="clientAddressID" id="clientAddressID">
 						<?= Form::populate_select_element_from_object($addresses, 'clientAddressID', 'address', '', '', 'Select Address')  ?>
 					</select>
 				</div>
 
 				<div class="form-group col-md-6">
-					<label class="nott mb-0 t500 text-primary">Contact Role</label>				  			
+					<label class="nott mb-0 t500 text-primary">Contact Role</label>
 					<select class="form-control form-control-xs form-control-plaintext border-bottom bg-light pl-2" name="contactTypeID">
 						<?php echo Form::populate_select_element_from_object($contactTypes, 'contactTypeID', 'contactType',  '', '', 'Select contact Role')  ?>
 					</select>
-				</div>			
+				</div>
 			</div>
-		</div>		
+		</div>
 	</fieldset>
 </div>

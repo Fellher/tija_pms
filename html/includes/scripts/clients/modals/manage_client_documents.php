@@ -1,6 +1,6 @@
 <div class="client-documents" id="clientDocumentsModalForm">
-   <input type="hidden" name="clientID" value="<?= $clientID; ?>">
-   <input type="hidden" name="clientDocumentID" value="">
+   <input type="hidden" name="clientID" id="clientID" value="<?= isset($clientID) ? $clientID : (isset($clientDetails) ? $clientDetails->clientID : '') ?>">
+   <input type="hidden" name="clientDocumentID" id="clientDocumentID" value="">
 
    <div class="form-group">
       <label for="documentName" class="form-label">Document Name</label>
@@ -28,13 +28,13 @@
 
             ?>
              <option value="other">Add New Document Type</option>
-      </select>     
+      </select>
    </div>
    <div class="card card-body bg-light shadow-lg my-3 newDocumentTypeDiv d-none">
       <h5 class="t300 border-bottom border-bottom-2" >Add new Document Type</h5>
       <div class="form-group">
          <label for="documentTypeName"> Document Type NAme</label>
-         <input type="text" id="documentTypeName" name="documentTypeName" class="form-control-sm px-2 form-control-plaintext bg-light-blue border-bottom" placeholder="Enter document type name"> 
+         <input type="text" id="documentTypeName" name="documentTypeName" class="form-control-sm px-2 form-control-plaintext bg-light-blue border-bottom" placeholder="Enter document type name">
 
       </div>
       <div class="form-group">

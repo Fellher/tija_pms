@@ -18,14 +18,18 @@
         <div class="steps-container">
             <div class="step active" data-step="1">
                 <div class="step-number">1</div>
-                <div class="step-label">Client & Opportunity</div>
+                <div class="step-label">Opportunity</div>
             </div>
             <div class="step" data-step="2">
                 <div class="step-number">2</div>
-                <div class="step-label">Details & Value</div>
+                <div class="step-label">Client</div>
             </div>
             <div class="step" data-step="3">
                 <div class="step-number">3</div>
+                <div class="step-label">Details & Value</div>
+            </div>
+            <div class="step" data-step="4">
+                <div class="step-number">4</div>
                 <div class="step-label">Timeline & Probability</div>
             </div>
         </div>
@@ -39,11 +43,46 @@
         <input type="hidden" name="salesPersonID" value="<?= $userDetails->ID ?>">
         <input type="hidden" name="saleStage" value="<?= $state ?>">
 
-        <!-- Step 1: Client & Opportunity -->
+        <!-- Step 1: Opportunity -->
         <div class="wizard-step" data-step="1">
             <h5 class="step-title mb-3">
+                <i class="ri-briefcase-line text-primary me-2"></i>
+                Opportunity Information
+            </h5>
+
+            <!-- Opportunity Name -->
+            <div class="form-group mb-3">
+                <label for="salesCaseName" class="form-label">
+                    Opportunity Name <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control" id="salesCaseName" name="salesCaseName"
+                       placeholder="e.g., Annual Audit 2025" required>
+                <div class="form-text">Provide a descriptive name for this opportunity</div>
+            </div>
+
+            <!-- Business Unit -->
+            <div class="form-group mb-3">
+                <label for="businessUnitID" class="form-label">
+                    Business Unit <span class="text-danger">*</span>
+                </label>
+                <select id="businessUnitID" name="businessUnitID" class="form-select" required>
+                    <option value="">Select business unit...</option>
+                    <?php
+                    if ($businessUnits) {
+                        foreach ($businessUnits as $unit) {
+                            echo "<option value='{$unit->businessUnitID}'>{$unit->businessUnitName}</option>";
+                        }
+                    }
+                    ?>
+                </select>
+            </div>
+        </div>
+
+        <!-- Step 2: Client -->
+        <div class="wizard-step d-none" data-step="2">
+            <h5 class="step-title mb-3">
                 <i class="ri-building-line text-primary me-2"></i>
-                Client & Opportunity Information
+                Client Information
             </h5>
 
             <!-- Client Selection -->
@@ -74,22 +113,23 @@
                 </h6>
 
                 <div class="row g-3">
+                    <!-- Basic Client Info -->
                     <div class="col-md-6">
                         <label for="newClientName" class="form-label">Client Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="newClientName" name="newClientName" placeholder="Enter client name">
+                        <input type="text" class="form-control" id="newClientName" name="clientName" placeholder="Enter client name">
                     </div>
 
                     <div class="col-md-6">
                         <label for="newClientCode" class="form-label">Client Code</label>
-                        <input type="text" class="form-control" id="newClientCode" name="newClientCode" placeholder="Auto-generated">
+                        <input type="text" class="form-control" id="newClientCode" name="clientCode" placeholder="Auto-generated">
                     </div>
 
+                    <!-- Sector & Industry -->
                     <div class="col-md-6">
                         <label for="newClientSector" class="form-label">Sector</label>
-                        <select class="form-select" id="newClientSector" name="newClientSectorID">
+                        <select class="form-select" id="newClientSector" name="clientSectorID">
                             <option value="">Select sector...</option>
                             <?php
-                            $sectors = Data::tija_sectors([], false, $DBConn);
                             if ($sectors) {
                                 foreach ($sectors as $sector) {
                                     echo "<option value='{$sector->sectorID}'>{$sector->sectorName}</option>";
@@ -101,52 +141,83 @@
 
                     <div class="col-md-6">
                         <label for="newClientIndustry" class="form-label">Industry</label>
-                        <select class="form-select" id="newClientIndustry" name="newClientIndustryID">
+                        <select class="form-select" id="newClientIndustry" name="clientIndustryID">
                             <option value="">Select industry...</option>
                         </select>
+                    </div>
+
+                    <!-- Address -->
+                    <div class="col-md-12">
+                        <label for="address" class="form-label">Address</label>
+                        <textarea class="form-control" id="address" name="address" rows="2" placeholder="Street / Address"></textarea>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="city" class="form-label">City</label>
+                        <input type="text" class="form-control" id="city" name="city" placeholder="City">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="countryID" class="form-label">Country</label>
+                        <select class="form-select" id="countryID" name="countryID">
+                            <option value="">Select country...</option>
+                            <?php
+                            if (isset($countries) && $countries) {
+                                foreach ($countries as $country) {
+                                    echo "<option value='{$country->countryID}'>{$country->countryName}</option>";
+                                }
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="postalCode" class="form-label">Postal Code</label>
+                        <input type="text" class="form-control" id="postalCode" name="postalCode" placeholder="Postal Code">
+                    </div>
+
+                    <!-- Address Type -->
+                    <div class="col-md-6">
+                        <label class="form-label d-block">Address Type</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="addressType" id="postalAddress" value="postalAddress">
+                            <label class="form-check-label" for="postalAddress">Postal Address</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="addressType" id="officeAddress" value="officeAddress">
+                            <label class="form-check-label" for="officeAddress">Office Address</label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="billingAddress" id="billingAddress" value="BillingAddress">
+                            <label class="form-check-label" for="billingAddress">Billing Address</label>
+                        </div>
+                    </div>
+
+                    <!-- Primary Contact (minimal: Name & Email) -->
+                    <div class="col-md-6">
+                        <label for="contactName" class="form-label">Primary Contact Name</label>
+                        <input type="text" class="form-control" id="contactName" name="contactName" placeholder="Contact Name">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="contactEmail" class="form-label">Primary Contact Email</label>
+                        <input type="email" class="form-control" id="contactEmail" name="contactEmail" placeholder="contact@email.com">
                     </div>
                 </div>
             </div>
 
-            <!-- Contact Person -->
-            <div class="form-group mb-3">
+            <!-- Existing Client Contact Person (for selected existing client) -->
+            <div class="form-group mb-3" id="existingContactWrapper">
                 <label for="contactPersonID" class="form-label">Contact Person</label>
                 <select id="contactPersonID" name="salesCaseContactID" class="form-select">
                     <option value="">Select contact person...</option>
                 </select>
                 <div class="form-text">Will be populated based on selected client</div>
             </div>
-
-            <!-- Opportunity Name -->
-            <div class="form-group mb-3">
-                <label for="salesCaseName" class="form-label">
-                    Opportunity Name <span class="text-danger">*</span>
-                </label>
-                <input type="text" class="form-control" id="salesCaseName" name="salesCaseName"
-                       placeholder="e.g., Annual Audit 2025" required>
-                <div class="form-text">Provide a descriptive name for this opportunity</div>
-            </div>
-
-            <!-- Business Unit -->
-            <div class="form-group mb-3">
-                <label for="businessUnitID" class="form-label">
-                    Business Unit <span class="text-danger">*</span>
-                </label>
-                <select id="businessUnitID" name="businessUnitID" class="form-select" required>
-                    <option value="">Select business unit...</option>
-                    <?php
-                    if ($businessUnits) {
-                        foreach ($businessUnits as $unit) {
-                            echo "<option value='{$unit->businessUnitID}'>{$unit->businessUnitName}</option>";
-                        }
-                    }
-                    ?>
-                </select>
-            </div>
         </div>
 
-        <!-- Step 2: Details & Value -->
-        <div class="wizard-step d-none" data-step="2">
+        <!-- Step 3: Details & Value -->
+        <div class="wizard-step d-none" data-step="3">
             <h5 class="step-title mb-3">
                 <i class="ri-money-dollar-circle-line text-primary me-2"></i>
                 Opportunity Details & Value
@@ -235,8 +306,8 @@
             </div>
         </div>
 
-        <!-- Step 3: Timeline & Probability -->
-        <div class="wizard-step d-none" data-step="3">
+        <!-- Step 4: Timeline & Probability -->
+        <div class="wizard-step d-none" data-step="4">
             <h5 class="step-title mb-3">
                 <i class="ri-calendar-line text-primary me-2"></i>
                 Timeline & Next Steps
@@ -416,7 +487,7 @@
 class SalesFormWizard {
     constructor() {
         this.currentStep = 1;
-        this.totalSteps = 3;
+        this.totalSteps = 4;
         this.form = document.getElementById('enhancedSalesForm');
         this.init();
     }
@@ -572,11 +643,48 @@ class SalesFormWizard {
     handleClientChange(e) {
         const value = e.target.value;
         const newClientFields = document.getElementById('newClientFields');
+        const existingContactWrapper = document.getElementById('existingContactWrapper');
+        const contactSelect = document.getElementById('contactPersonID');
 
         if (value === 'new') {
             newClientFields?.classList.remove('d-none');
+
+            // Ensure hidden flag for backend to create a new client (manage_sale.php expects newClientNote)
+            let newClientNoteInput = newClientFields?.querySelector('input[name="newClientNote"]');
+            if (!newClientNoteInput) {
+                newClientNoteInput = document.createElement('input');
+                newClientNoteInput.type = 'hidden';
+                newClientNoteInput.name = 'newClientNote';
+                newClientNoteInput.value = 'newClient';
+                newClientFields.appendChild(newClientNoteInput);
+            } else {
+                newClientNoteInput.value = 'newClient';
+            }
+
+            // Hide and disable existing contact selection when creating a new client
+            if (existingContactWrapper) {
+                existingContactWrapper.classList.add('d-none');
+            }
+            if (contactSelect) {
+                contactSelect.disabled = true;
+                contactSelect.value = '';
+            }
         } else {
             newClientFields?.classList.add('d-none');
+
+            // Clear the newClientNote flag when not creating a new client
+            const newClientNoteInput = newClientFields?.querySelector('input[name="newClientNote"]');
+            if (newClientNoteInput) {
+                newClientNoteInput.value = '';
+            }
+
+            // Show and enable existing contact selection for existing clients
+            if (existingContactWrapper) {
+                existingContactWrapper.classList.remove('d-none');
+            }
+            if (contactSelect) {
+                contactSelect.disabled = false;
+            }
             this.loadClientContacts(value);
         }
     }
@@ -626,10 +734,35 @@ class SalesFormWizard {
         const sectorID = e.target.value;
         const industrySelect = document.getElementById('newClientIndustry');
 
-        if (!industrySelect || !sectorID) return;
+        if (!industrySelect) return;
 
-        // This would filter industries based on sector
-        // Implementation depends on your data structure
+        // Reset options to default placeholder
+        industrySelect.innerHTML = '<option value=\"\">Select industry...</option>';
+
+        // If no sector selected, leave only the placeholder
+        if (!sectorID) {
+            return;
+        }
+
+        // Ensure we have industries data available on the window
+        const allIndustries = Array.isArray(window.industries) ? window.industries : [];
+
+        // Filter industries that belong to the selected sector
+        const filteredIndustries = allIndustries.filter(industry => industry.sectorID == sectorID);
+
+        // If none found, show a helpful option
+        if (filteredIndustries.length === 0) {
+            industrySelect.innerHTML += '<option value=\"\" disabled>No industries available for selected sector</option>';
+            return;
+        }
+
+        // Populate the industry select with filtered options
+        filteredIndustries.forEach(industry => {
+            const option = document.createElement('option');
+            option.value = industry.industryID;
+            option.textContent = industry.industryName;
+            industrySelect.appendChild(option);
+        });
     }
 
     updateWeightedValue() {
@@ -665,30 +798,16 @@ class SalesFormWizard {
     handleSubmit(e) {
         e.preventDefault();
 
+        // Validate current (last) step before submitting
         if (!this.validateCurrentStep()) {
             return;
         }
 
-        // Submit form via AJAX
-        const formData = new FormData(this.form);
-
-        fetch('<?= $base ?>php/scripts/sales/manage_sale.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Sales opportunity saved successfully!');
-                location.reload();
-            } else {
-                alert('Error: ' + (data.message || 'Failed to save'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while saving');
-        });
+        // Let the browser submit the form normally so that manage_sale.php
+        // can perform its redirect to the sale_details page.
+        if (this.form) {
+            this.form.submit();
+        }
     }
 
     formatNumber(num) {

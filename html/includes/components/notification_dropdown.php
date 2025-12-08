@@ -327,7 +327,7 @@ if ($isValidUser) {
 
 <!-- Start::header-link|dropdown-toggle -->
 <a href="javascript:void(0);" class="header-link" id="notificationBell">
-    <i class="ri-notification-3-line header-link-icon animate-bell"></i>
+    <i class="ri-notification-3-line header-link-icon <?php echo $totalUnreadCount > 0 ? 'animate-bell' : ''; ?>"></i>
     <span class="badge bg-success rounded-pill header-icon-badge pulse pulse-success" id="notificationBadge" style="<?php echo $totalUnreadCount == 0 ? 'display: none;' : ''; ?>">
         <?php echo $totalUnreadCount; ?>
     </span>
@@ -436,13 +436,17 @@ if ($isValidUser) {
 
         // Load both system notifications and operational tasks
         Promise.all([
-            fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=8')
+            fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=8', {
+                credentials: 'same-origin'
+            })
                 .then(r => {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     return r.json().catch(() => ({ success: false, notifications: [], unreadCount: 0 }));
                 })
                 .catch(() => ({ success: false, notifications: [], unreadCount: 0 })),
-            fetch('<?php echo $base; ?>php/scripts/operational/tasks/get_pending_notifications.php')
+            fetch('<?php echo $base; ?>php/scripts/operational/tasks/get_pending_notifications.php', {
+                credentials: 'same-origin'
+            })
                 .then(r => {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     return r.json().catch(() => ({ success: false, notifications: [], count: 0 }));
@@ -719,13 +723,17 @@ if ($isValidUser) {
         } else {
             // Update badge count for both system and operational notifications
             Promise.all([
-                fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=1')
+                fetch('<?php echo $base; ?>php/scripts/notifications/get_user_notifications.php?limit=1', {
+                    credentials: 'same-origin'
+                })
                     .then(r => {
                         if (!r.ok) throw new Error('HTTP ' + r.status);
                         return r.json().catch(() => ({ success: false, unreadCount: 0 }));
                     })
                     .catch(() => ({ success: false, unreadCount: 0 })),
-                fetch('<?php echo $base; ?>php/scripts/operational/tasks/get_pending_notifications.php')
+                fetch('<?php echo $base; ?>php/scripts/operational/tasks/get_pending_notifications.php', {
+                    credentials: 'same-origin'
+                })
                     .then(r => {
                         if (!r.ok) throw new Error('HTTP ' + r.status);
                         return r.json().catch(() => ({ success: false, count: 0 }));

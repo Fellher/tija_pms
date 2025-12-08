@@ -43,6 +43,17 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
     </div>
 </div>
 
+<!-- View-Only Notice -->
+<div class="alert alert-info border-info bg-info-subtle mb-4">
+    <div class="d-flex align-items-center">
+        <i class="ri-eye-line fs-20 me-3"></i>
+        <div>
+            <strong>View-Only Access</strong>
+            <p class="mb-0 small">This is a read-only overview. To add, edit, or manage sales cases and projects, please navigate to the respective modules.</p>
+        </div>
+    </div>
+</div>
+
 <!-- Statistics Cards -->
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-sm-6">
@@ -136,7 +147,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                             <th class="fw-semibold">Status</th>
                             <th class="fw-semibold text-center">Probability</th>
                             <th class="fw-semibold">Expected Close Date</th>
-                            <th class="text-center" style="width: 80px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -184,14 +194,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                                     <i class="ri-calendar-line text-muted me-1"></i>
                                     <?= $OrderDate->format('d M Y') ?>
                                 </td>
-                                <td class="text-center">
-                                    <a href=""
-                                       class="editSales text-primary"
-                                       data-id="<?= $sale->salesCaseID ?>"
-                                       title="Edit Sale">
-                                        <i class="ri-edit-line fs-18"></i>
-                                    </a>
-                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -232,7 +234,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                             <th class="fw-semibold">Project Owner</th>
                             <th class="fw-semibold text-end">Project Value</th>
                             <th class="fw-semibold text-end">Work Hours</th>
-                            <th class="text-center" style="width: 80px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -280,14 +281,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                                         <i class="ri-time-line me-1"></i>
                                         <?= number_format($workHours, 0) ?> hrs
                                     </span>
-                                </td>
-                                <td class="text-center">
-                                    <a href=""
-                                       class="editProject text-info"
-                                       data-id="<?= $projVal->projectID ?>"
-                                       title="Edit Project">
-                                        <i class="ri-edit-line fs-18"></i>
-                                    </a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -338,7 +331,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                                 <th class="fw-semibold">Project Name</th>
                                 <th class="fw-semibold">Completion Date</th>
                                 <th class="fw-semibold text-end">Project Value</th>
-                                <th class="text-center" style="width: 80px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -365,13 +357,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                                     </td>
                                     <td class="text-end fw-semibold text-success">
                                         KES <?= $completedValue ?>
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="<?= $base ?>html/?s=<?= $s ?>&ss=projects&p=project&pid=<?= $completed->projectID ?>"
-                                           class="text-success"
-                                           title="View Project">
-                                            <i class="ri-eye-line fs-18"></i>
-                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -405,7 +390,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                                 <th class="fw-semibold">Sales Person</th>
                                 <th class="fw-semibold text-end">Estimated Value</th>
                                 <th class="fw-semibold">Lost Date</th>
-                                <th class="text-center" style="width: 80px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -439,13 +423,6 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
                                             <span class="text-muted">N/A</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="text-center">
-                                        <a href="<?= $base ?>html/?s=<?= $s ?>&ss=sales&p=sale_details&saleid=<?= $lost->salesCaseID ?>"
-                                           class="text-danger"
-                                           title="View Sale">
-                                            <i class="ri-eye-line fs-18"></i>
-                                        </a>
-                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -458,15 +435,8 @@ $lostSales = Sales::sales_case_mid(array('clientID'=>$clientID, 'closeStatus'=>'
     </div>
 </div>
 
-<!-- Modals -->
-<?php
-echo Utility::form_modal_header("manageProjectCase", "projects/manage_project_case.php", "Add New Project Case", array("modal-dialog-centered", "modal-lg"), $base, true );
-include 'includes/scripts/projects/modals/manage_project_cases.php';
-echo Utility::form_modal_footer();
-echo Utility::form_modal_header("manageSale", "sales/manage_sale.php", "Manage Sale", array('modal-md', 'modal-dialog-centered'), $base);
-include "includes/scripts/sales/modals/manage_sale.php";
-echo Utility::form_modal_footer('Save Sale', 'saveSale',  ' btn btn-success btn-sm', true);
-?>
+<!-- Modals Removed - View Only Access -->
+<!-- All add/edit operations should be done from the dedicated Sales or Projects modules -->
 
 <!-- ============================================================================
      SALES & PROJECTS DOCUMENTATION MODAL
@@ -592,7 +562,7 @@ echo Utility::form_modal_footer('Save Sale', 'saveSale',  ' btn btn-success btn-
                             <ul class="small text-muted mb-0">
                                 <li><strong>Probability Badges:</strong> Green (80%+), Yellow (50-79%), Red (&lt;50%)</li>
                                 <li><strong>View Details:</strong> Click on a case name to view full details</li>
-                                <li><strong>Edit Sale:</strong> Click the edit icon in the Actions column</li>
+                                <li><strong>Read-Only:</strong> To modify sales cases, visit the Sales module</li>
                             </ul>
                         </div>
                         <div class="list-group-item">
@@ -711,10 +681,10 @@ echo Utility::form_modal_footer('Save Sale', 'saveSale',  ' btn btn-success btn-
                                 <strong>View Details:</strong> Click on any case name to open the detailed sales case page with full information.
                             </li>
                             <li class="mb-2">
-                                <strong>Edit Sale:</strong> Click the edit icon (<i class="ri-edit-line"></i>) in the Actions column to modify sale information.
+                                <strong>Read-Only Access:</strong> This is a view-only section. To add, edit, or update sales cases, navigate to the Sales module.
                             </li>
                             <li class="mb-2">
-                                <strong>Update Status:</strong> Edit the sale to change its status and probability as it progresses through the sales pipeline.
+                                <strong>Quick Overview:</strong> Use this tab to quickly review all sales cases associated with this client.
                             </li>
                             <li class="mb-2">
                                 <strong>Note:</strong> To add new sales cases, please navigate to the Sales module from the main menu.
@@ -801,7 +771,7 @@ echo Utility::form_modal_footer('Save Sale', 'saveSale',  ' btn btn-success btn-
                                 <strong>View Project Details:</strong> Click on any project code to access the comprehensive project management page.
                             </li>
                             <li class="mb-2">
-                                <strong>Edit Project:</strong> Click the edit icon (<i class="ri-edit-line"></i>) in the Actions column to modify project information.
+                                <strong>Read-Only Access:</strong> This is a view-only section. To add, edit, or manage projects, navigate to the Projects module.
                             </li>
                             <li class="mb-2">
                                 <strong>Monitor Progress:</strong> Use the project details page to track phases, tasks, and deliverables.

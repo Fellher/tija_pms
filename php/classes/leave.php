@@ -1611,12 +1611,92 @@ class Leave {
      * @param object $DBConn
      * @return array
      */
+    /**
+     * Get workflow summary for a leave application
+     * Returns counts of approved/rejected/pending approvers and their names
+     *
+     * @param int $applicationId Leave application ID
+     * @param object $DBConn Database connection object
+     * @return array|null Summary with counts and names, or null if no workflow
+     */
     public static function get_leave_workflow_summary($applicationId, $DBConn) {
-        // Workflow tables are temporarily ignored; return empty summary
+        if (empty($applicationId)) {
+            return null;
+        }
+
+        // Check if workflow tables exist
+        $tableCheck = $DBConn->fetch_all_rows("SHOW TABLES LIKE 'tija_leave_approval_instances'", array());
+        if (!$tableCheck || count($tableCheck) === 0) {
+            return null;
+        }
+
+        // Get workflow instance
+        $lapsedCheck = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances LIKE 'Lapsed'", array());
+        $hasLapsedColumn = ($lapsedCheck && count($lapsedCheck) > 0);
+
+        $whereClause = "leaveApplicationID = ?";
+        $params = array(array($applicationId, 'i'));
+
+        if ($hasLapsedColumn) {
+            $whereClause .= " AND Lapsed = 'N'";
+        }
+
+        $instance = $DBConn->fetch_all_rows(
+            "SELECT * FROM tija_leave_approval_instances WHERE {$whereClause}",
+            $params
+        );
+
+        if (!$instance || count($instance) === 0) {
+            return null;
+        }
+
+        $inst = is_object($instance[0]) ? (array)$instance[0] : $instance[0];
+        $instanceID = $inst['instanceID'] ?? null;
+        $policyID = $inst['policyID'] ?? null;
+
+        if (!$instanceID || !$policyID) {
+            return null;
+        }
+
+        // Get approval status
+        $approvalStatus = self::check_workflow_approval_status($instanceID, $policyID, $DBConn);
+
+        $approvedCount = 0;
+        $rejectedCount = 0;
+        $pendingCount = 0;
+        $approvedBy = array();
+        $rejectedBy = array();
+
+        if (isset($approvalStatus['steps']) && is_array($approvalStatus['steps'])) {
+            foreach ($approvalStatus['steps'] as $step) {
+                if (isset($step['approvers']) && is_array($step['approvers'])) {
+                    foreach ($step['approvers'] as $approver) {
+                        if (isset($approver['hasActed']) && $approver['hasActed']) {
+                            $action = isset($approver['action']) ? strtolower($approver['action']) : '';
+                            $approverName = $approver['approverName'] ?? 'Unknown';
+
+                            if ($action === 'approved') {
+                                $approvedCount++;
+                                $approvedBy[] = $approverName;
+                            } elseif ($action === 'rejected') {
+                                $rejectedCount++;
+                                $rejectedBy[] = $approverName;
+                            }
+                        } else {
+                            $pendingCount++;
+                        }
+                    }
+                }
+            }
+        }
+
         return array(
-            'instance' => null,
-            'steps' => array(),
-            'pendingApprovers' => array()
+            'approvedCount' => $approvedCount,
+            'rejectedCount' => $rejectedCount,
+            'pendingCount' => $pendingCount,
+            'approvedBy' => implode(', ', $approvedBy),
+            'rejectedBy' => implode(', ', $rejectedBy),
+            'hasWorkflow' => true
         );
     }
 
@@ -2933,13 +3013,15 @@ class Leave {
 
             $approverUserID = null;
             $approverName = '';
+            $approverEmail = '';
 
             switch ($stepType) {
                 case 'supervisor':
                     if (!empty($employee->supervisorID)) {
                         $approverUserID = (int)$employee->supervisorID;
                         $supervisor = Employee::employees(array('ID' => $approverUserID), true, $DBConn);
-                        $approverName = $supervisor ? ($supervisor->FirstName . ' ' . $supervisor->Surname) : 'Supervisor';
+                        $approverName = $supervisor ? ($supervisor->employeeName) : 'Supervisor';
+                        $approverEmail = $supervisor && isset($supervisor->Email) ? $supervisor->Email : '';
                         error_log("Leave::resolve_dynamic_workflow_approvers - Resolved supervisor: {$approverUserID}");
                     }
                     break;
@@ -2948,7 +3030,8 @@ class Leave {
                     $deptHead = Employee::get_employee_department_head($employeeID, $DBConn);
                     if ($deptHead && !empty($deptHead->ID)) {
                         $approverUserID = (int)$deptHead->ID;
-                        $approverName = is_object($deptHead) ? ($deptHead->FirstName . ' ' . $deptHead->Surname) : 'Department Head';
+                        $approverName = is_object($deptHead) ? ($deptHead->employeeName) : 'Department Head';
+                        $approverEmail = is_object($deptHead) && isset($deptHead->Email) ? $deptHead->Email : '';
                         error_log("Leave::resolve_dynamic_workflow_approvers - Resolved department head: {$approverUserID}");
                     }
                     break;
@@ -2959,7 +3042,8 @@ class Leave {
                     if (!empty($employee->supervisorID)) {
                         $approverUserID = (int)$employee->supervisorID;
                         $supervisor = Employee::employees(array('ID' => $approverUserID), true, $DBConn);
-                        $approverName = $supervisor ? ($supervisor->FirstName . ' ' . $supervisor->Surname) : 'Project Manager';
+                        $approverName = $supervisor ? ($supervisor->employeeName) : 'Project Manager';
+                        $approverEmail = $supervisor && isset($supervisor->Email) ? $supervisor->Email : '';
                         error_log("Leave::resolve_dynamic_workflow_approvers - Resolved project manager (using supervisor): {$approverUserID}");
                     }
                     break;
@@ -2969,23 +3053,32 @@ class Leave {
                     if ($hrManager && !empty($hrManager->ID)) {
                         $approverUserID = (int)$hrManager->ID;
                         $approverName = is_object($hrManager) ? ($hrManager->FirstName . ' ' . $hrManager->Surname) : 'HR Manager';
+                        $approverEmail = is_object($hrManager) && isset($hrManager->Email) ? $hrManager->Email : '';
                         error_log("Leave::resolve_dynamic_workflow_approvers - Resolved HR manager: {$approverUserID}");
                     }
                     break;
             }
 
             if ($approverUserID) {
+                // Ensure stepID and stepOrder are both set
+                if (!$stepID || !$stepOrder) {
+                    error_log("Leave::resolve_dynamic_workflow_approvers - ERROR: Missing stepID or stepOrder for approver. stepID: " . ($stepID ?? 'NULL') . ", stepOrder: " . ($stepOrder ?? 'NULL') . ", stepType: {$stepType}");
+                    continue; // Skip this approver if step info is missing
+                }
+
                 $resolvedApprovers[] = array(
-                    'stepID' => $stepID,
-                    'stepOrder' => $stepOrder,
+                    'stepID' => (int)$stepID,
+                    'stepOrder' => (int)$stepOrder,
                     'stepName' => $stepObj->stepName ?? 'Approval Step',
                     'stepDescription' => $stepObj->stepDescription ?? null,
-                    'approverUserID' => $approverUserID,
+                    'approverUserID' => (int)$approverUserID,
                     'approverName' => $approverName,
-                    'approverEmail' => '', // Can be fetched if needed
+                    'approverEmail' => $approverEmail,
                     'isBackup' => 'N',
                     'notificationOrder' => 1
                 );
+
+                error_log("Leave::resolve_dynamic_workflow_approvers - Added approver: UserID: {$approverUserID}, StepID: {$stepID}, StepOrder: {$stepOrder}, StepType: {$stepType}");
             } else {
                 error_log("Leave::resolve_dynamic_workflow_approvers - WARNING: Could not resolve approver for step {$stepID} ({$stepType})");
             }
@@ -3353,7 +3446,10 @@ class Leave {
         }
 
         // Get all approvers for the policy
-        $approvers = self::get_workflow_approvers($policyID, $DBConn);
+
+        // $approvers = self::get_workflow_approvers($policyID, $DBConn);
+        // echo "<h4>approvers</h4>";
+        // echo $approvers ? "<pre>" . htmlspecialchars(print_r($approvers, true)) . "</pre>" : "No approvers found";
 
         // If no saved approvers and we have employee ID, resolve dynamic approvers
         if (empty($approvers) && $employeeID) {
@@ -3404,6 +3500,7 @@ class Leave {
             // Get approvers for this step
             $stepApprovers = array();
             foreach ($approvers as $approver) {
+
                 if (isset($approver['stepID']) && (int)$approver['stepID'] === $stepID) {
                     $approverUserID = isset($approver['approverUserID']) ? (int)$approver['approverUserID'] : null;
                     $isBackup = isset($approver['isBackup']) && strtoupper($approver['isBackup']) === 'Y';
@@ -3413,6 +3510,16 @@ class Leave {
                     $hasActed = isset($actionMap[$actionKey]);
                     $action = $hasActed ? $actionMap[$actionKey] : null;
 
+                    // Use actionDate (new column name) or fall back to decisionDate (old column name)
+                    $dateActed = null;
+                    if ($hasActed) {
+                        if (isset($action['actionDate'])) {
+                            $dateActed = $action['actionDate'];
+                        } elseif (isset($action['decisionDate'])) {
+                            $dateActed = $action['decisionDate'];
+                        }
+                    }
+
                     $stepApprovers[] = array(
                         'approverUserID' => $approverUserID,
                         'approverName' => isset($approver['approverName']) ? $approver['approverName'] : 'Unknown',
@@ -3421,7 +3528,7 @@ class Leave {
                         'hasActed' => $hasActed,
                         'action' => $hasActed ? (isset($action['action']) ? $action['action'] : null) : null,
                         'comments' => $hasActed ? (isset($action['comments']) ? $action['comments'] : null) : null,
-                        'decisionDate' => $hasActed ? (isset($action['decisionDate']) ? $action['decisionDate'] : null) : null
+                        'actionDate' => $dateActed
                     );
 
                     // Check for rejection
@@ -3822,6 +3929,712 @@ class Leave {
             'skipped' => $skipped,
             'errors' => $errors
         );
+    }
+
+    /**
+     * Get organization-wide leave analytics
+     *
+     * @param int $orgDataID Organization data ID
+     * @param int $entityID Entity ID (null for all entities)
+     * @param string $startDate Start date (Y-m-d)
+     * @param string $endDate End date (Y-m-d)
+     * @param object $DBConn Database connection object
+     * @return array Comprehensive analytics data
+     */
+    public static function get_organization_leave_analytics($orgDataID, $entityID, $startDate, $endDate, $DBConn) {
+        $analytics = array(
+            'totalApplications' => 0,
+            'approvedApplications' => 0,
+            'rejectedApplications' => 0,
+            'pendingApplications' => 0,
+            'totalLeaveDays' => 0,
+            'approvedLeaveDays' => 0,
+            'averageApplicationDays' => 0,
+            'utilizationRate' => 0,
+            'totalEmployees' => 0,
+            'employeesOnLeave' => 0,
+            'topLeaveType' => 'N/A',
+            'peakAbsencePeriod' => 'N/A'
+        );
+
+        // Build WHERE clause
+        $where = array('la.Lapsed = ?', 'la.Suspended = ?');
+        $params = array(array('N', 's'), array('N', 's'));
+
+        if ($orgDataID) {
+            $where[] = 'la.orgDataID = ?';
+            $params[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $where[] = 'la.entityID = ?';
+            $params[] = array($entityID, 'i');
+        }
+
+        $where[] = 'la.startDate >= ?';
+        $where[] = 'la.startDate <= ?';
+        $params[] = array($startDate, 's');
+        $params[] = array($endDate, 's');
+
+        $whereClause = implode(' AND ', $where);
+
+        // Get application statistics
+        $sql = "SELECT
+                    COUNT(*) as totalApplications,
+                    SUM(CASE WHEN la.leaveStatusID = 6 THEN 1 ELSE 0 END) as approvedApplications,
+                    SUM(CASE WHEN la.leaveStatusID = 4 THEN 1 ELSE 0 END) as rejectedApplications,
+                    SUM(CASE WHEN la.leaveStatusID = 3 THEN 1 ELSE 0 END) as pendingApplications,
+                    SUM(la.noOfDays) as totalLeaveDays,
+                    SUM(CASE WHEN la.leaveStatusID = 6 THEN la.noOfDays ELSE 0 END) as approvedLeaveDays,
+                    AVG(la.noOfDays) as averageApplicationDays
+                FROM tija_leave_applications la
+                WHERE {$whereClause}";
+
+        $result = $DBConn->fetch_all_rows($sql, $params);
+        if ($result && count($result) > 0) {
+            $row = is_object($result[0]) ? (array)$result[0] : $result[0];
+            $analytics['totalApplications'] = (int)($row['totalApplications'] ?? 0);
+            $analytics['approvedApplications'] = (int)($row['approvedApplications'] ?? 0);
+            $analytics['rejectedApplications'] = (int)($row['rejectedApplications'] ?? 0);
+            $analytics['pendingApplications'] = (int)($row['pendingApplications'] ?? 0);
+            $analytics['totalLeaveDays'] = (float)($row['totalLeaveDays'] ?? 0);
+            $analytics['approvedLeaveDays'] = (float)($row['approvedLeaveDays'] ?? 0);
+            $analytics['averageApplicationDays'] = round((float)($row['averageApplicationDays'] ?? 0), 1);
+        }
+
+        // Get employee count
+        $empWhere = array('ud.Lapsed = ?', 'ud.Suspended = ?');
+        $empParams = array(array('N', 's'), array('N', 's'));
+
+        if ($orgDataID) {
+            $empWhere[] = 'ud.orgDataID = ?';
+            $empParams[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $empWhere[] = 'ud.entityID = ?';
+            $empParams[] = array($entityID, 'i');
+        }
+
+        $empWhereClause = implode(' AND ', $empWhere);
+
+        $empSql = "SELECT COUNT(DISTINCT ud.ID) as totalEmployees
+                   FROM user_details ud
+                   WHERE {$empWhereClause}";
+
+        $empResult = $DBConn->fetch_all_rows($empSql, $empParams);
+        if ($empResult && count($empResult) > 0) {
+            $empRow = is_object($empResult[0]) ? (array)$empResult[0] : $empResult[0];
+            $analytics['totalEmployees'] = (int)($empRow['totalEmployees'] ?? 0);
+        }
+
+        // Calculate utilization rate
+        if ($analytics['totalEmployees'] > 0) {
+            $analytics['utilizationRate'] = round(($analytics['approvedLeaveDays'] / ($analytics['totalEmployees'] * 20)) * 100, 1);
+        }
+
+        // Get employees currently on leave
+        $currentDate = date('Y-m-d');
+        $onLeaveSql = "SELECT COUNT(DISTINCT la.employeeID) as employeesOnLeave
+                       FROM tija_leave_applications la
+                       WHERE {$whereClause}
+                       AND la.startDate <= ?
+                       AND la.endDate >= ?
+                       AND la.leaveStatusID = 6";
+
+        $onLeaveParams = array_merge($params, array(array($currentDate, 's'), array($currentDate, 's')));
+        $onLeaveResult = $DBConn->fetch_all_rows($onLeaveSql, $onLeaveParams);
+        if ($onLeaveResult && count($onLeaveResult) > 0) {
+            $onLeaveRow = is_object($onLeaveResult[0]) ? (array)$onLeaveResult[0] : $onLeaveResult[0];
+            $analytics['employeesOnLeave'] = (int)($onLeaveRow['employeesOnLeave'] ?? 0);
+        }
+
+        // Get top leave type
+        $typeSql = "SELECT lt.leaveTypeName, COUNT(*) as count
+                    FROM tija_leave_applications la
+                    LEFT JOIN tija_leave_types lt ON la.leaveTypeID = lt.leaveTypeID
+                    WHERE {$whereClause}
+                    GROUP BY la.leaveTypeID
+                    ORDER BY count DESC
+                    LIMIT 1";
+
+        $typeResult = $DBConn->fetch_all_rows($typeSql, $params);
+        if ($typeResult && count($typeResult) > 0) {
+            $typeRow = is_object($typeResult[0]) ? (array)$typeResult[0] : $typeResult[0];
+            $analytics['topLeaveType'] = $typeRow['leaveTypeName'] ?? 'N/A';
+        }
+
+        // Get peak absence period (month with most leave days)
+        $peakSql = "SELECT DATE_FORMAT(la.startDate, '%Y-%m') as month,
+                           DATE_FORMAT(la.startDate, '%M %Y') as monthName,
+                           SUM(la.noOfDays) as totalDays
+                    FROM tija_leave_applications la
+                    WHERE {$whereClause}
+                    AND la.leaveStatusID = 6
+                    GROUP BY month
+                    ORDER BY totalDays DESC
+                    LIMIT 1";
+
+        $peakResult = $DBConn->fetch_all_rows($peakSql, $params);
+        if ($peakResult && count($peakResult) > 0) {
+            $peakRow = is_object($peakResult[0]) ? (array)$peakResult[0] : $peakResult[0];
+            $analytics['peakAbsencePeriod'] = $peakRow['monthName'] ?? 'N/A';
+        }
+
+        return $analytics;
+    }
+
+    /**
+     * Get departmental leave breakdown
+     *
+     * @param int $orgDataID Organization data ID
+     * @param int $entityID Entity ID
+     * @param string $startDate Start date
+     * @param string $endDate End date
+     * @param object $DBConn Database connection object
+     * @return array Department-wise breakdown
+     */
+    public static function get_departmental_leave_breakdown($orgDataID, $entityID, $startDate, $endDate, $DBConn) {
+        $where = array('la.Lapsed = ?', 'la.Suspended = ?');
+        $params = array(array('N', 's'), array('N', 's'));
+
+        if ($orgDataID) {
+            $where[] = 'la.orgDataID = ?';
+            $params[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $where[] = 'la.entityID = ?';
+            $params[] = array($entityID, 'i');
+        }
+
+        $where[] = 'la.startDate >= ?';
+        $where[] = 'la.startDate <= ?';
+        $params[] = array($startDate, 's');
+        $params[] = array($endDate, 's');
+
+        $whereClause = implode(' AND ', $where);
+
+        $sql = "SELECT
+                    COALESCE(bu.businessUnitName, 'Unassigned') as departmentName,
+                    COALESCE(bu.businessUnitID, 0) as departmentID,
+                    COUNT(*) as totalApplications,
+                    SUM(CASE WHEN la.leaveStatusID = 6 THEN 1 ELSE 0 END) as approvedApplications,
+                    SUM(CASE WHEN la.leaveStatusID = 4 THEN 1 ELSE 0 END) as rejectedApplications,
+                    SUM(la.noOfDays) as totalDays,
+                    SUM(CASE WHEN la.leaveStatusID = 6 THEN la.noOfDays ELSE 0 END) as approvedDays,
+                    AVG(la.noOfDays) as averageDays,
+                    COUNT(DISTINCT la.employeeID) as uniqueEmployees
+                FROM tija_leave_applications la
+                LEFT JOIN people p ON la.employeeID = p.ID
+                LEFT JOIN user_details ud ON p.ID = ud.ID
+                LEFT JOIN tija_business_units bu ON ud.businessUnitID = bu.businessUnitID
+                WHERE {$whereClause}
+                GROUP BY bu.businessUnitID
+                ORDER BY approvedDays DESC";
+
+        $rows = $DBConn->fetch_all_rows($sql, $params);
+
+        $breakdown = array();
+        if ($rows) {
+            foreach ($rows as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $breakdown[] = array(
+                    'departmentName' => $rowData['departmentName'],
+                    'departmentID' => (int)$rowData['departmentID'],
+                    'totalApplications' => (int)$rowData['totalApplications'],
+                    'approvedApplications' => (int)$rowData['approvedApplications'],
+                    'rejectedApplications' => (int)$rowData['rejectedApplications'],
+                    'totalDays' => (float)$rowData['totalDays'],
+                    'approvedDays' => (float)$rowData['approvedDays'],
+                    'averageDays' => round((float)$rowData['averageDays'], 1),
+                    'uniqueEmployees' => (int)$rowData['uniqueEmployees'],
+                    'utilizationRate' => $rowData['uniqueEmployees'] > 0
+                        ? round(($rowData['approvedDays'] / ($rowData['uniqueEmployees'] * 20)) * 100, 1)
+                        : 0
+                );
+            }
+        }
+
+        return $breakdown;
+    }
+
+    /**
+     * Get leave type distribution
+     *
+     * @param int $orgDataID Organization data ID
+     * @param int $entityID Entity ID
+     * @param string $startDate Start date
+     * @param string $endDate End date
+     * @param object $DBConn Database connection object
+     * @return array Leave type distribution
+     */
+    public static function get_leave_type_distribution($orgDataID, $entityID, $startDate, $endDate, $DBConn) {
+        $where = array('la.Lapsed = ?', 'la.Suspended = ?', 'la.leaveStatusID = ?');
+        $params = array(array('N', 's'), array('N', 's'), array(6, 'i')); // Only approved
+
+        if ($orgDataID) {
+            $where[] = 'la.orgDataID = ?';
+            $params[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $where[] = 'la.entityID = ?';
+            $params[] = array($entityID, 'i');
+        }
+
+        $where[] = 'la.startDate >= ?';
+        $where[] = 'la.startDate <= ?';
+        $params[] = array($startDate, 's');
+        $params[] = array($endDate, 's');
+
+        $whereClause = implode(' AND ', $where);
+
+        $sql = "SELECT
+                    lt.leaveTypeName,
+                    lt.leaveTypeID,
+                    COUNT(*) as applicationCount,
+                    SUM(la.noOfDays) as totalDays,
+                    AVG(la.noOfDays) as averageDays,
+                    COUNT(DISTINCT la.employeeID) as uniqueEmployees
+                FROM tija_leave_applications la
+                LEFT JOIN tija_leave_types lt ON la.leaveTypeID = lt.leaveTypeID
+                WHERE {$whereClause}
+                GROUP BY la.leaveTypeID
+                ORDER BY totalDays DESC";
+
+        $rows = $DBConn->fetch_all_rows($sql, $params);
+
+        $distribution = array();
+        $totalDaysAll = 0;
+
+        if ($rows) {
+            foreach ($rows as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $totalDaysAll += (float)$rowData['totalDays'];
+            }
+
+            foreach ($rows as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $totalDays = (float)$rowData['totalDays'];
+                $distribution[] = array(
+                    'leaveTypeName' => $rowData['leaveTypeName'],
+                    'leaveTypeID' => (int)$rowData['leaveTypeID'],
+                    'applicationCount' => (int)$rowData['applicationCount'],
+                    'totalDays' => $totalDays,
+                    'averageDays' => round((float)$rowData['averageDays'], 1),
+                    'uniqueEmployees' => (int)$rowData['uniqueEmployees'],
+                    'percentage' => $totalDaysAll > 0 ? round(($totalDays / $totalDaysAll) * 100, 1) : 0
+                );
+            }
+        }
+
+        return $distribution;
+    }
+
+    /**
+     * Get approval workflow metrics
+     *
+     * @param int $orgDataID Organization data ID
+     * @param int $entityID Entity ID
+     * @param string $startDate Start date
+     * @param string $endDate End date
+     * @param object $DBConn Database connection object
+     * @return array Workflow performance metrics
+     */
+    public static function get_approval_workflow_metrics($orgDataID, $entityID, $startDate, $endDate, $DBConn) {
+        $metrics = array(
+            'averageApprovalTime' => 0,
+            'medianApprovalTime' => 0,
+            'rejectionRate' => 0,
+            'approvalRate' => 0,
+            'averageStepsToApproval' => 0,
+            'bottleneckStep' => 'N/A',
+            'fastestApprover' => 'N/A',
+            'slowestApprover' => 'N/A',
+            'stepMetrics' => array()
+        );
+
+        // Build WHERE clause
+        $where = array('la.Lapsed = ?', 'la.Suspended = ?');
+        $params = array(array('N', 's'), array('N', 's'));
+
+        if ($orgDataID) {
+            $where[] = 'la.orgDataID = ?';
+            $params[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $where[] = 'la.entityID = ?';
+            $params[] = array($entityID, 'i');
+        }
+
+        $where[] = 'la.startDate >= ?';
+        $where[] = 'la.startDate <= ?';
+        $params[] = array($startDate, 's');
+        $params[] = array($endDate, 's');
+        $where[] = 'la.leaveStatusID IN (4, 6)'; // Approved or Rejected
+
+        $whereClause = implode(' AND ', $where);
+
+        // Calculate approval times
+        $sql = "SELECT
+                    la.leaveApplicationID,
+                    la.leaveStatusID,
+                    la.dateApplied,
+                    la.LastUpdate,
+                    TIMESTAMPDIFF(HOUR, la.dateApplied, la.LastUpdate) as approvalTimeHours
+                FROM tija_leave_applications la
+                WHERE {$whereClause}
+                AND la.dateApplied IS NOT NULL";
+
+        $result = $DBConn->fetch_all_rows($sql, $params);
+
+        if ($result && count($result) > 0) {
+            $approvalTimes = array();
+            $approvedCount = 0;
+            $rejectedCount = 0;
+
+            foreach ($result as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $statusID = (int)$rowData['leaveStatusID'];
+                $hours = (float)($rowData['approvalTimeHours'] ?? 0);
+
+                if ($hours > 0) {
+                    $approvalTimes[] = $hours;
+                }
+
+                if ($statusID == 6) {
+                    $approvedCount++;
+                } elseif ($statusID == 4) {
+                    $rejectedCount++;
+                }
+            }
+
+            $totalProcessed = $approvedCount + $rejectedCount;
+
+            if (count($approvalTimes) > 0) {
+                $metrics['averageApprovalTime'] = round(array_sum($approvalTimes) / count($approvalTimes), 1);
+                sort($approvalTimes);
+                $metrics['medianApprovalTime'] = $approvalTimes[floor(count($approvalTimes) / 2)];
+            }
+
+            if ($totalProcessed > 0) {
+                $metrics['rejectionRate'] = round(($rejectedCount / $totalProcessed) * 100, 1);
+                $metrics['approvalRate'] = round(($approvedCount / $totalProcessed) * 100, 1);
+            }
+        }
+
+        // Get step-level metrics (if workflow tables exist)
+        $tableCheck = $DBConn->fetch_all_rows("SHOW TABLES LIKE 'tija_leave_approval_actions'", array());
+        if ($tableCheck && count($tableCheck) > 0) {
+            $stepSql = "SELECT
+                            s.stepName,
+                            s.stepOrder,
+                            COUNT(*) as actionCount,
+                            SUM(CASE WHEN act.action = 'approved' THEN 1 ELSE 0 END) as approvedCount,
+                            SUM(CASE WHEN act.action = 'rejected' THEN 1 ELSE 0 END) as rejectedCount,
+                            AVG(act.responseTime) as avgResponseTime
+                        FROM tija_leave_approval_actions act
+                        INNER JOIN tija_leave_approval_instances i ON act.instanceID = i.instanceID
+                        INNER JOIN tija_leave_approval_steps s ON act.stepID = s.stepID
+                        INNER JOIN tija_leave_applications la ON i.leaveApplicationID = la.leaveApplicationID
+                        WHERE {$whereClause}
+                        GROUP BY s.stepID
+                        ORDER BY s.stepOrder";
+
+            $stepResult = $DBConn->fetch_all_rows($stepSql, $params);
+            if ($stepResult) {
+                foreach ($stepResult as $row) {
+                    $rowData = is_object($row) ? (array)$row : $row;
+                    $metrics['stepMetrics'][] = array(
+                        'stepName' => $rowData['stepName'],
+                        'stepOrder' => (int)$rowData['stepOrder'],
+                        'actionCount' => (int)$rowData['actionCount'],
+                        'approvedCount' => (int)$rowData['approvedCount'],
+                        'rejectedCount' => (int)$rowData['rejectedCount'],
+                        'avgResponseTime' => round((float)($rowData['avgResponseTime'] ?? 0), 1)
+                    );
+                }
+            }
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * Get concurrent absence analysis
+     *
+     * @param int $orgDataID Organization data ID
+     * @param int $entityID Entity ID
+     * @param string $startDate Start date
+     * @param string $endDate End date
+     * @param object $DBConn Database connection object
+     * @return array Concurrent absence data
+     */
+    public static function get_concurrent_absence_analysis($orgDataID, $entityID, $startDate, $endDate, $DBConn) {
+        $analysis = array(
+            'maxConcurrentAbsences' => 0,
+            'maxConcurrentDate' => null,
+            'averageConcurrentAbsences' => 0,
+            'highRiskDates' => array(),
+            'departmentalImpact' => array(),
+            'dailyAbsences' => array()
+        );
+
+        $where = array('la.Lapsed = ?', 'la.Suspended = ?', 'la.leaveStatusID = ?');
+        $params = array(array('N', 's'), array('N', 's'), array(6, 'i'));
+
+        if ($orgDataID) {
+            $where[] = 'la.orgDataID = ?';
+            $params[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $where[] = 'la.entityID = ?';
+            $params[] = array($entityID, 'i');
+        }
+
+        $whereClause = implode(' AND ', $where);
+
+        // Get daily absence counts
+        $sql = "SELECT
+                    DATE(calendar.date) as absenceDate,
+                    COUNT(DISTINCT la.employeeID) as employeesAbsent,
+                    GROUP_CONCAT(DISTINCT CONCAT(p.FirstName, ' ', p.Surname) SEPARATOR ', ') as employeeNames
+                FROM (
+                    SELECT DATE_ADD(? , INTERVAL seq.seq DAY) as date
+                    FROM (
+                        SELECT 0 as seq UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION
+                        SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION
+                        SELECT 20 UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25 UNION SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29 UNION
+                        SELECT 30 UNION SELECT 31 UNION SELECT 32 UNION SELECT 33 UNION SELECT 34 UNION SELECT 35 UNION SELECT 36 UNION SELECT 37 UNION SELECT 38 UNION SELECT 39 UNION
+                        SELECT 40 UNION SELECT 41 UNION SELECT 42 UNION SELECT 43 UNION SELECT 44 UNION SELECT 45 UNION SELECT 46 UNION SELECT 47 UNION SELECT 48 UNION SELECT 49 UNION
+                        SELECT 50 UNION SELECT 51 UNION SELECT 52 UNION SELECT 53 UNION SELECT 54 UNION SELECT 55 UNION SELECT 56 UNION SELECT 57 UNION SELECT 58 UNION SELECT 59 UNION
+                        SELECT 60 UNION SELECT 61 UNION SELECT 62 UNION SELECT 63 UNION SELECT 64 UNION SELECT 65 UNION SELECT 66 UNION SELECT 67 UNION SELECT 68 UNION SELECT 69 UNION
+                        SELECT 70 UNION SELECT 71 UNION SELECT 72 UNION SELECT 73 UNION SELECT 74 UNION SELECT 75 UNION SELECT 76 UNION SELECT 77 UNION SELECT 78 UNION SELECT 79 UNION
+                        SELECT 80 UNION SELECT 81 UNION SELECT 82 UNION SELECT 83 UNION SELECT 84 UNION SELECT 85 UNION SELECT 86 UNION SELECT 87 UNION SELECT 88 UNION SELECT 89 UNION
+                        SELECT 90 UNION SELECT 91 UNION SELECT 92 UNION SELECT 93 UNION SELECT 94 UNION SELECT 95 UNION SELECT 96 UNION SELECT 97 UNION SELECT 98 UNION SELECT 99 UNION
+                        SELECT 100 UNION SELECT 101 UNION SELECT 102 UNION SELECT 103 UNION SELECT 104 UNION SELECT 105 UNION SELECT 106 UNION SELECT 107 UNION SELECT 108 UNION SELECT 109 UNION
+                        SELECT 110 UNION SELECT 111 UNION SELECT 112 UNION SELECT 113 UNION SELECT 114 UNION SELECT 115 UNION SELECT 116 UNION SELECT 117 UNION SELECT 118 UNION SELECT 119 UNION
+                        SELECT 120 UNION SELECT 121 UNION SELECT 122 UNION SELECT 123 UNION SELECT 124 UNION SELECT 125 UNION SELECT 126 UNION SELECT 127 UNION SELECT 128 UNION SELECT 129 UNION
+                        SELECT 130 UNION SELECT 131 UNION SELECT 132 UNION SELECT 133 UNION SELECT 134 UNION SELECT 135 UNION SELECT 136 UNION SELECT 137 UNION SELECT 138 UNION SELECT 139 UNION
+                        SELECT 140 UNION SELECT 141 UNION SELECT 142 UNION SELECT 143 UNION SELECT 144 UNION SELECT 145 UNION SELECT 146 UNION SELECT 147 UNION SELECT 148 UNION SELECT 149 UNION
+                        SELECT 150 UNION SELECT 151 UNION SELECT 152 UNION SELECT 153 UNION SELECT 154 UNION SELECT 155 UNION SELECT 156 UNION SELECT 157 UNION SELECT 158 UNION SELECT 159 UNION
+                        SELECT 160 UNION SELECT 161 UNION SELECT 162 UNION SELECT 163 UNION SELECT 164 UNION SELECT 165 UNION SELECT 166 UNION SELECT 167 UNION SELECT 168 UNION SELECT 169 UNION
+                        SELECT 170 UNION SELECT 171 UNION SELECT 172 UNION SELECT 173 UNION SELECT 174 UNION SELECT 175 UNION SELECT 176 UNION SELECT 177 UNION SELECT 178 UNION SELECT 179 UNION
+                        SELECT 180 UNION SELECT 181 UNION SELECT 182 UNION SELECT 183 UNION SELECT 184 UNION SELECT 185 UNION SELECT 186 UNION SELECT 187 UNION SELECT 188 UNION SELECT 189 UNION
+                        SELECT 190 UNION SELECT 191 UNION SELECT 192 UNION SELECT 193 UNION SELECT 194 UNION SELECT 195 UNION SELECT 196 UNION SELECT 197 UNION SELECT 198 UNION SELECT 199 UNION
+                        SELECT 200 UNION SELECT 201 UNION SELECT 202 UNION SELECT 203 UNION SELECT 204 UNION SELECT 205 UNION SELECT 206 UNION SELECT 207 UNION SELECT 208 UNION SELECT 209 UNION
+                        SELECT 210 UNION SELECT 211 UNION SELECT 212 UNION SELECT 213 UNION SELECT 214 UNION SELECT 215 UNION SELECT 216 UNION SELECT 217 UNION SELECT 218 UNION SELECT 219 UNION
+                        SELECT 220 UNION SELECT 221 UNION SELECT 222 UNION SELECT 223 UNION SELECT 224 UNION SELECT 225 UNION SELECT 226 UNION SELECT 227 UNION SELECT 228 UNION SELECT 229 UNION
+                        SELECT 230 UNION SELECT 231 UNION SELECT 232 UNION SELECT 233 UNION SELECT 234 UNION SELECT 235 UNION SELECT 236 UNION SELECT 237 UNION SELECT 238 UNION SELECT 239 UNION
+                        SELECT 240 UNION SELECT 241 UNION SELECT 242 UNION SELECT 243 UNION SELECT 244 UNION SELECT 245 UNION SELECT 246 UNION SELECT 247 UNION SELECT 248 UNION SELECT 249 UNION
+                        SELECT 250 UNION SELECT 251 UNION SELECT 252 UNION SELECT 253 UNION SELECT 254 UNION SELECT 255 UNION SELECT 256 UNION SELECT 257 UNION SELECT 258 UNION SELECT 259 UNION
+                        SELECT 260 UNION SELECT 261 UNION SELECT 262 UNION SELECT 263 UNION SELECT 264 UNION SELECT 265 UNION SELECT 266 UNION SELECT 267 UNION SELECT 268 UNION SELECT 269 UNION
+                        SELECT 270 UNION SELECT 271 UNION SELECT 272 UNION SELECT 273 UNION SELECT 274 UNION SELECT 275 UNION SELECT 276 UNION SELECT 277 UNION SELECT 278 UNION SELECT 279 UNION
+                        SELECT 280 UNION SELECT 281 UNION SELECT 282 UNION SELECT 283 UNION SELECT 284 UNION SELECT 285 UNION SELECT 286 UNION SELECT 287 UNION SELECT 288 UNION SELECT 289 UNION
+                        SELECT 290 UNION SELECT 291 UNION SELECT 292 UNION SELECT 293 UNION SELECT 294 UNION SELECT 295 UNION SELECT 296 UNION SELECT 297 UNION SELECT 298 UNION SELECT 299 UNION
+                        SELECT 300 UNION SELECT 301 UNION SELECT 302 UNION SELECT 303 UNION SELECT 304 UNION SELECT 305 UNION SELECT 306 UNION SELECT 307 UNION SELECT 308 UNION SELECT 309 UNION
+                        SELECT 310 UNION SELECT 311 UNION SELECT 312 UNION SELECT 313 UNION SELECT 314 UNION SELECT 315 UNION SELECT 316 UNION SELECT 317 UNION SELECT 318 UNION SELECT 319 UNION
+                        SELECT 320 UNION SELECT 321 UNION SELECT 322 UNION SELECT 323 UNION SELECT 324 UNION SELECT 325 UNION SELECT 326 UNION SELECT 327 UNION SELECT 328 UNION SELECT 329 UNION
+                        SELECT 330 UNION SELECT 331 UNION SELECT 332 UNION SELECT 333 UNION SELECT 334 UNION SELECT 335 UNION SELECT 336 UNION SELECT 337 UNION SELECT 338 UNION SELECT 339 UNION
+                        SELECT 340 UNION SELECT 341 UNION SELECT 342 UNION SELECT 343 UNION SELECT 344 UNION SELECT 345 UNION SELECT 346 UNION SELECT 347 UNION SELECT 348 UNION SELECT 349 UNION
+                        SELECT 350 UNION SELECT 351 UNION SELECT 352 UNION SELECT 353 UNION SELECT 354 UNION SELECT 355 UNION SELECT 356 UNION SELECT 357 UNION SELECT 358 UNION SELECT 359 UNION
+                        SELECT 360 UNION SELECT 361 UNION SELECT 362 UNION SELECT 363 UNION SELECT 364 UNION SELECT 365
+                    ) seq
+                    WHERE DATE_ADD(?, INTERVAL seq.seq DAY) <= ?
+                ) calendar
+                LEFT JOIN tija_leave_applications la ON calendar.date BETWEEN la.startDate AND la.endDate
+                    AND {$whereClause}
+                LEFT JOIN people p ON la.employeeID = p.ID
+                GROUP BY absenceDate
+                HAVING employeesAbsent > 0
+                ORDER BY absenceDate";
+
+        $calendarParams = array(
+            array($startDate, 's'),
+            array($startDate, 's'),
+            array($endDate, 's')
+        );
+        $calendarParams = array_merge($calendarParams, $params);
+
+        $dailyResult = $DBConn->fetch_all_rows($sql, $calendarParams);
+
+        if ($dailyResult) {
+            $maxCount = 0;
+            $totalAbsences = 0;
+            $dayCount = 0;
+
+            foreach ($dailyResult as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $count = (int)$rowData['employeesAbsent'];
+                $date = $rowData['absenceDate'];
+
+                $analysis['dailyAbsences'][] = array(
+                    'date' => $date,
+                    'count' => $count,
+                    'employees' => $rowData['employeeNames'] ?? ''
+                );
+
+                $totalAbsences += $count;
+                $dayCount++;
+
+                if ($count > $maxCount) {
+                    $maxCount = $count;
+                    $analysis['maxConcurrentDate'] = $date;
+                }
+
+                // High risk if more than 10% of workforce absent
+                if ($count > ($metrics['totalEmployees'] ?? 0) * 0.1 && $count >= 3) {
+                    $analysis['highRiskDates'][] = array(
+                        'date' => $date,
+                        'count' => $count,
+                        'employees' => $rowData['employeeNames'] ?? ''
+                    );
+                }
+            }
+
+            $analysis['maxConcurrentAbsences'] = $maxCount;
+            $analysis['averageConcurrentAbsences'] = $dayCount > 0 ? round($totalAbsences / $dayCount, 1) : 0;
+        }
+
+        return $analysis;
+    }
+
+    /**
+     * Get employee leave detailed analysis
+     *
+     * @param int $employeeID Employee ID
+     * @param int $year Year (null for all)
+     * @param object $DBConn Database connection object
+     * @return array Detailed employee leave data
+     */
+    public static function get_employee_leave_detailed($employeeID, $year, $DBConn) {
+        $where = array('la.employeeID = ?', 'la.Lapsed = ?', 'la.Suspended = ?');
+        $params = array(array($employeeID, 'i'), array('N', 's'), array('N', 's'));
+
+        if ($year) {
+            $where[] = 'YEAR(la.startDate) = ?';
+            $params[] = array($year, 'i');
+        }
+
+        $whereClause = implode(' AND ', $where);
+
+        $sql = "SELECT
+                    la.*,
+                    lt.leaveTypeName,
+                    ls.leaveStatusName,
+                    lp.leavePeriodName,
+                    CONCAT(approver.FirstName, ' ', approver.Surname) as approverName
+                FROM tija_leave_applications la
+                LEFT JOIN tija_leave_types lt ON la.leaveTypeID = lt.leaveTypeID
+                LEFT JOIN tija_leave_status ls ON la.leaveStatusID = ls.leaveStatusID
+                LEFT JOIN tija_leave_periods lp ON la.leavePeriodID = lp.leavePeriodID
+                LEFT JOIN tija_leave_approvals lappr ON la.leaveApplicationID = lappr.leaveApplicationID
+                LEFT JOIN people approver ON lappr.leaveApproverID = approver.ID
+                WHERE {$whereClause}
+                ORDER BY la.startDate DESC";
+
+        $rows = $DBConn->fetch_all_rows($sql, $params);
+
+        $applications = array();
+        if ($rows) {
+            foreach ($rows as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $applications[] = $rowData;
+            }
+        }
+
+        // Get summary statistics
+        $summary = array(
+            'totalApplications' => count($applications),
+            'totalDaysTaken' => 0,
+            'approvedApplications' => 0,
+            'rejectedApplications' => 0,
+            'pendingApplications' => 0
+        );
+
+        foreach ($applications as $app) {
+            $summary['totalDaysTaken'] += (float)($app['noOfDays'] ?? 0);
+
+            $statusID = (int)($app['leaveStatusID'] ?? 0);
+            if ($statusID == 6) {
+                $summary['approvedApplications']++;
+            } elseif ($statusID == 4) {
+                $summary['rejectedApplications']++;
+            } elseif ($statusID == 3) {
+                $summary['pendingApplications']++;
+            }
+        }
+
+        return array(
+            'applications' => $applications,
+            'summary' => $summary
+        );
+    }
+
+    /**
+     * Get monthly leave trends
+     *
+     * @param int $orgDataID Organization data ID
+     * @param int $entityID Entity ID
+     * @param string $startDate Start date
+     * @param string $endDate End date
+     * @param object $DBConn Database connection object
+     * @return array Monthly trends data
+     */
+    public static function get_monthly_leave_trends($orgDataID, $entityID, $startDate, $endDate, $DBConn) {
+        $where = array('la.Lapsed = ?', 'la.Suspended = ?', 'la.leaveStatusID = ?');
+        $params = array(array('N', 's'), array('N', 's'), array(6, 'i'));
+
+        if ($orgDataID) {
+            $where[] = 'la.orgDataID = ?';
+            $params[] = array($orgDataID, 'i');
+        }
+
+        if ($entityID) {
+            $where[] = 'la.entityID = ?';
+            $params[] = array($entityID, 'i');
+        }
+
+        $where[] = 'la.startDate >= ?';
+        $where[] = 'la.startDate <= ?';
+        $params[] = array($startDate, 's');
+        $params[] = array($endDate, 's');
+
+        $whereClause = implode(' AND ', $where);
+
+        $sql = "SELECT
+                    DATE_FORMAT(la.startDate, '%Y-%m') as month,
+                    DATE_FORMAT(la.startDate, '%b %Y') as monthLabel,
+                    COUNT(*) as applicationCount,
+                    SUM(la.noOfDays) as totalDays,
+                    COUNT(DISTINCT la.employeeID) as uniqueEmployees,
+                    AVG(la.noOfDays) as averageDays
+                FROM tija_leave_applications la
+                WHERE {$whereClause}
+                GROUP BY month
+                ORDER BY month";
+
+        $rows = $DBConn->fetch_all_rows($sql, $params);
+
+        $trends = array();
+        if ($rows) {
+            foreach ($rows as $row) {
+                $rowData = is_object($row) ? (array)$row : $row;
+                $trends[] = array(
+                    'month' => $rowData['month'],
+                    'monthLabel' => $rowData['monthLabel'],
+                    'applicationCount' => (int)$rowData['applicationCount'],
+                    'totalDays' => (float)$rowData['totalDays'],
+                    'uniqueEmployees' => (int)$rowData['uniqueEmployees'],
+                    'averageDays' => round((float)$rowData['averageDays'], 1)
+                );
+            }
+        }
+
+        return $trends;
     }
 
 }?>

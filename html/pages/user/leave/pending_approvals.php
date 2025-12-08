@@ -16,8 +16,6 @@ if (!$isValidUser) {
 
 $userID = $userDetails->ID;
 
-
-
 /**
  * Normalize approval records (object/array) into consistent associative arrays.
  */
@@ -58,6 +56,8 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
         true,
         $DBConn
     );
+
+
 
     if (!$leaveApp) {
         return $result;
@@ -148,6 +148,7 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
         if ($steps && count($steps) > 0) {
             // Get current step from instance
             $currentStepOrder = isset($inst['currentStepOrder']) ? (int)$inst['currentStepOrder'] : 1;
+            $approvalType = isset($inst['approvalType']) ? $inst['approvalType'] : 'parallel';
 
             foreach ($steps as $step) {
                 $stepObj = is_object($step) ? $step : (object)$step;
@@ -155,9 +156,10 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
                 $stepOrder = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
                 $stepID = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
 
-                // Only check steps that match current step order or are pending
-                if ($stepOrder > $currentStepOrder) {
-                    continue; // Future steps
+                // For HR managers, check all steps (parallel workflow allows this)
+                // For others, only check current or past steps in sequential workflow
+                if ($approvalType === 'sequential' && $stepType !== 'hr_manager' && $stepOrder > $currentStepOrder) {
+                    continue; // Future steps in sequential workflow
                 }
 
                 // Check if user matches dynamic approver role
@@ -166,7 +168,7 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
                 switch ($stepType) {
                     case 'supervisor':
                         // Check if user is the employee's supervisor
-                        if (!empty($employee->supervisorID) && (int)$employee->supervisorID === $userID) {
+                        if (!empty($employee->supervisorID) && (int)$employee->supervisorID === (int)$userID) {
                             $isDynamicApprover = true;
                         }
                         break;
@@ -174,14 +176,14 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
                     case 'department_head':
                         // Check if user is the employee's department head
                         $deptHead = Employee::get_employee_department_head($employeeID, $DBConn);
-                        if ($deptHead && !empty($deptHead->ID) && (int)$deptHead->ID === $userID) {
+                        if ($deptHead && !empty($deptHead->ID) && (int)$deptHead->ID === (int)$userID) {
                             $isDynamicApprover = true;
                         }
                         break;
 
                     case 'project_manager':
                         // For now, fall back to supervisor check
-                        if (!empty($employee->supervisorID) && (int)$employee->supervisorID === $userID) {
+                        if (!empty($employee->supervisorID) && (int)$employee->supervisorID === (int)$userID) {
                             $isDynamicApprover = true;
                         }
                         break;
@@ -194,6 +196,7 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
                         break;
                 }
 
+
                 if ($isDynamicApprover) {
                     $result['isApprover'] = true;
                     $result['stepID'] = $stepID;
@@ -204,9 +207,46 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
         }
     }
 
-    // HR managers can approve even if not explicitly in workflow (final step)
+    // HR managers can approve even if not explicitly in workflow
+    // Find their step if not already found
     if (!$result['isApprover'] && $isHrManager) {
         $result['isApprover'] = true;
+
+        // Try to find the HR step in the workflow
+        $steps = Leave::leave_approval_steps(
+            array('policyID' => $policyID, 'Suspended' => 'N'),
+            false,
+            $DBConn
+        );
+
+        if ($steps && count($steps) > 0) {
+            // Find the last HR manager step or the final step
+            $hrStep = null;
+            $finalStep = null;
+            $maxStepOrder = 0;
+
+            foreach ($steps as $step) {
+                $stepObj = is_object($step) ? $step : (object)$step;
+                $stepType = $stepObj->stepType ?? '';
+                $stepOrder = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
+
+                if ($stepOrder > $maxStepOrder) {
+                    $maxStepOrder = $stepOrder;
+                    $finalStep = $stepObj;
+                }
+
+                if ($stepType === 'hr_manager') {
+                    $hrStep = $stepObj;
+                }
+            }
+
+            // Prefer HR step, otherwise use final step
+            $targetStep = $hrStep ?? $finalStep;
+            if ($targetStep) {
+                $result['stepID'] = isset($targetStep->stepID) ? (int)$targetStep->stepID : null;
+                $result['stepOrder'] = isset($targetStep->stepOrder) ? (int)$targetStep->stepOrder : null;
+            }
+        }
     }
 
     // Check if user has already acted
@@ -345,6 +385,43 @@ if (empty($pendingApprovalsMap) && $userBusinessUnitID && $isDepartmentHead) {
 $pendingApprovals = array_values($pendingApprovalsMap);
 $pendingCount = count($pendingApprovals);
 
+// Pre-fetch workflow rejection status for all pending approvals (for performance)
+$workflowRejectionCache = array();
+foreach ($pendingApprovals as $approval) {
+    $leaveID = (int)($approval['leaveApplicationID'] ?? 0);
+    if ($leaveID > 0) {
+        $instanceID = $approval['instanceID'] ?? null;
+        $policyID = $approval['policyID'] ?? null;
+
+        // Fetch if not already in approval data
+        if ((!$instanceID || !$policyID)) {
+            $lapsedCheck = $DBConn->fetch_all_rows("SHOW COLUMNS FROM tija_leave_approval_instances LIKE 'Lapsed'", array());
+            $hasLapsedColumn = ($lapsedCheck && count($lapsedCheck) > 0);
+            $whereClause = "leaveApplicationID = ?";
+            $params = array(array($leaveID, 'i'));
+            if ($hasLapsedColumn) {
+                $whereClause .= " AND Lapsed = 'N'";
+            }
+            $instance = $DBConn->fetch_all_rows(
+                "SELECT instanceID, policyID FROM tija_leave_approval_instances WHERE {$whereClause} LIMIT 1",
+                $params
+            );
+            if ($instance && count($instance) > 0) {
+                $instData = is_object($instance[0]) ? (array)$instance[0] : $instance[0];
+                $instanceID = $instData['instanceID'] ?? null;
+                $policyID = $instData['policyID'] ?? null;
+            }
+        }
+
+        if ($instanceID && $policyID) {
+            $appStatus = Leave::check_workflow_approval_status($instanceID, $policyID, $DBConn);
+            $workflowRejectionCache[$leaveID] = isset($appStatus['hasRejection']) && $appStatus['hasRejection'];
+        } else {
+            $workflowRejectionCache[$leaveID] = false;
+        }
+    }
+}
+
 // Load target application data early if provided
 $targetApplicationData = null;
 $targetApplicationRole = null;
@@ -363,18 +440,74 @@ if ($targetApplicationID) {
         // Check user's approver role
         $targetApplicationRole = checkUserApproverRole($targetApplicationID, $userID, $DBConn);
 
+        /**
+         * Browser-friendly debug output for target application role
+         * targetApplicationRole: <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre>
+         */?>
+        <div class="alert alert-secondary p-2 mb-2 small">
+            <div class="fw-bold mb-1">Target Application Role Debug Info</div>
+            <ul class="mb-1 ps-3">
+                <li><strong>targetApplicationRole: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre></li>
+            </ul>
+        </div>
+        <?php
         // Get workflow approval status
         if ($targetApplicationRole['instanceID'] && $targetApplicationRole['policyID']) {
+
+            var_dump($targetApplicationRole['instanceID']);
+            var_dump($targetApplicationRole['policyID']);
             $targetApprovalStatus = Leave::check_workflow_approval_status(
                 $targetApplicationRole['instanceID'],
                 $targetApplicationRole['policyID'],
                 $DBConn
             );
         }
+
+        // Additional context for approver UX
+        $targetAppArray = is_object($targetApplicationData) ? (array)$targetApplicationData : $targetApplicationData;
+        $targetEmployeeID = isset($targetAppArray['employeeID']) ? (int)$targetAppArray['employeeID'] : 0;
+
+        // Past leave summary for this employee (current year)
+        $targetEmployeeLeaveAnalytics = $targetEmployeeID ? Leave::get_leave_analytics($targetEmployeeID, $DBConn) : null;
+
+        // Recent leave applications for this employee (last 3)
+        $targetEmployeeRecentLeaves = array();
+        if ($targetEmployeeID) {
+            $recentLeavesRaw = Leave::leave_applications_full(
+                array(
+                    'employeeID' => $targetEmployeeID,
+                    'Lapsed' => 'N',
+                    'Suspended' => 'N'
+                ),
+                false,
+                $DBConn
+            );
+            if ($recentLeavesRaw) {
+                foreach ($recentLeavesRaw as $row) {
+                    $rowArr = is_object($row) ? (array)$row : $row;
+                    // Exclude the current application
+                    if ((int)($rowArr['leaveApplicationID'] ?? 0) === (int)$targetApplicationID) {
+                        continue;
+                    }
+                    $targetEmployeeRecentLeaves[] = $rowArr;
+                }
+                // Sort by start date descending and keep top 3
+                usort($targetEmployeeRecentLeaves, function($a, $b) {
+                    return strcmp($b['startDate'], $a['startDate']);
+                });
+                $targetEmployeeRecentLeaves = array_slice($targetEmployeeRecentLeaves, 0, 3);
+            }
+        }
+
+        // Team leave snapshot for the current approver (direct reports + HR scope)
+        $targetTeamLeaveAnalytics = Leave::get_team_leave_analytics($userID, $DBConn, $hrManagerScope ?? null);
+
+        // Supporting documents for this leave application
+        $targetApplicationDocuments = Leave::get_leave_application_documents($targetApplicationID, $DBConn);
     }
 }
 
-// var_dump($targetApplicationRole);
+
 // var_dump($targetApplicationData);
 // var_dump($targetApprovalStatus);
 function formatDateRange($start, $end)
@@ -407,7 +540,8 @@ function formatDateRange($start, $end)
         </div>
     </div>
 
-    <?php if ($targetApplicationID && $targetApplicationData): ?>
+    <?php
+    if ($targetApplicationID && $targetApplicationData): ?>
         <?php
             $targetApp = is_object($targetApplicationData) ? (array)$targetApplicationData : $targetApplicationData;
             $targetEmployee = Employee::employees(array('ID' => $targetApp['employeeID']), true, $DBConn);
@@ -418,6 +552,17 @@ function formatDateRange($start, $end)
             $targetEndDate = Utility::date_format($targetApp['endDate']);
             $targetAppliedOn = $targetApp['dateApplied'] ? date('M j, Y g:i a', strtotime($targetApp['dateApplied'])) : '-';
         ?>
+
+        <!-- Browser-friendly debug output for target application data -->
+        <div class="alert alert-secondary p-2 mb-2 small">
+            <div class="fw-bold mb-1">Target Application Debug Info</div>
+            <ul class="mb-1 ps-3">
+                <li><strong>targetApp: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApp, true)); ?></pre></li>
+                <li><strong>targetApplicationRole: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre></li>
+                <li><strong>targetApprovalStatus: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApprovalStatus, true)); ?></pre></li>
+
+            </ul>
+        </div>
         <div class="card border-0 shadow-sm mb-4" id="targetApplicationCard">
             <div class="card-header bg-primary text-white">
                 <div class="d-flex justify-content-between align-items-center">
@@ -461,20 +606,222 @@ function formatDateRange($start, $end)
                     </div>
                 <?php endif; ?>
 
-                <?php if ($targetApprovalStatus && isset($targetApprovalStatus['steps'])): ?>
+                <div class="row g-3 mb-4">
+                    <?php if (!empty($targetEmployeeLeaveAnalytics)): ?>
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header bg-white pb-2">
+                                    <h6 class="mb-0 text-uppercase small text-muted">
+                                        <i class="ri-bar-chart-2-line me-1 text-primary"></i>Past Leave Summary (This Year)
+                                    </h6>
+                                </div>
+                                <div class="card-body pt-2">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Total days taken</span>
+                                        <span class="fw-semibold">
+                                            <?php echo (float)($targetEmployeeLeaveAnalytics['totalLeaveDays'] ?? 0); ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Applications</span>
+                                        <span class="fw-semibold">
+                                            <?php echo (int)($targetEmployeeLeaveAnalytics['totalApplications'] ?? 0); ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Approval rate</span>
+                                        <span class="fw-semibold">
+                                            <?php echo isset($targetEmployeeLeaveAnalytics['approvalRate'])
+                                                ? $targetEmployeeLeaveAnalytics['approvalRate'] . '%'
+                                                : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Avg. duration</span>
+                                        <span class="fw-semibold">
+                                            <?php echo isset($targetEmployeeLeaveAnalytics['averageDuration'])
+                                                ? $targetEmployeeLeaveAnalytics['averageDuration'] . ' day(s)'
+                                                : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Avg. notice</span>
+                                        <span class="fw-semibold">
+                                            <?php echo isset($targetEmployeeLeaveAnalytics['averageAdvanceNotice'])
+                                                ? $targetEmployeeLeaveAnalytics['averageAdvanceNotice'] . ' day(s)'
+                                                : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    <?php if (!empty($targetEmployeeLeaveAnalytics['peakLeaveMonths'])): ?>
+                                        <div class="mt-1">
+                                            <span class="text-muted small d-block">Peak months</span>
+                                            <span class="fw-semibold small">
+                                                <?php echo htmlspecialchars($targetEmployeeLeaveAnalytics['peakLeaveMonths']); ?>
+                                            </span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($targetEmployeeRecentLeaves)): ?>
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header bg-white pb-2">
+                                    <h6 class="mb-0 text-uppercase small text-muted">
+                                        <i class="ri-time-line me-1 text-primary"></i>Recent Leave History
+                                    </h6>
+                                </div>
+                                <div class="card-body pt-2">
+                                    <ul class="list-unstyled mb-0 small">
+                                        <?php foreach ($targetEmployeeRecentLeaves as $recent): ?>
+                                            <?php
+                                                $recentStart = Utility::date_format($recent['startDate']);
+                                                $recentEnd = Utility::date_format($recent['endDate']);
+                                                $recentDays = $recent['noOfDays'] ?? '-';
+                                                $recentStatus = $recent['leaveStatusName'] ?? '';
+                                            ?>
+                                            <li class="mb-2">
+                                                <div class="fw-semibold">
+                                                    <?php echo htmlspecialchars($recent['leaveTypeName'] ?? 'Leave'); ?>
+                                                </div>
+                                                <div class="text-muted">
+                                                    <?php echo "{$recentStart} - {$recentEnd} ({$recentDays} day(s))"; ?>
+                                                </div>
+                                                <div>
+                                                    <span class="badge bg-light text-dark border">
+                                                        <?php echo htmlspecialchars($recentStatus); ?>
+                                                    </span>
+                                                </div>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($targetTeamLeaveAnalytics) && !empty($targetTeamLeaveAnalytics['totalTeamMembers'])): ?>
+                        <div class="col-lg-4">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header bg-white pb-2">
+                                    <h6 class="mb-0 text-uppercase small text-muted">
+                                        <i class="ri-group-line me-1 text-primary"></i>Your Team Snapshot
+                                    </h6>
+                                </div>
+                                <div class="card-body pt-2">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Team members</span>
+                                        <span class="fw-semibold">
+                                            <?php echo (int)$targetTeamLeaveAnalytics['totalTeamMembers']; ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Pending approvals</span>
+                                        <span class="fw-semibold">
+                                            <?php echo (int)$targetTeamLeaveAnalytics['pendingApprovals']; ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Approved this month</span>
+                                        <span class="fw-semibold">
+                                            <?php echo (int)$targetTeamLeaveAnalytics['approvedThisMonth']; ?>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted small">Currently on leave</span>
+                                        <span class="fw-semibold">
+                                            <?php echo (int)$targetTeamLeaveAnalytics['currentlyOnLeave']; ?>
+                                        </span>
+                                    </div>
+                                    <div class="mt-1">
+                                        <span class="text-muted small d-block">Team utilization</span>
+                                        <span class="fw-semibold small">
+                                            <?php echo isset($targetTeamLeaveAnalytics['teamLeaveUtilization'])
+                                                ? $targetTeamLeaveAnalytics['teamLeaveUtilization'] . '%'
+                                                : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <?php
+                    $handoverRequired = $targetApp['handoverRequired'] ?? 'N';
+                    $handoverNotes = $targetApp['handoverNotes'] ?? '';
+                ?>
+
+                <?php if ($handoverRequired === 'Y' || !empty($handoverNotes)): ?>
+                    <div class="mb-3">
+                        <h6 class="text-muted text-uppercase small mb-2">
+                            <i class="ri-route-line me-1 text-primary"></i>Handover & Impacted Tasks
+                        </h6>
+                        <?php if ($handoverRequired === 'Y'): ?>
+                            <p class="mb-1 small text-muted">
+                                This application requires a formal handover. Review the notes below and, if needed, open the detailed handover report.
+                            </p>
+                        <?php endif; ?>
+                        <?php if (!empty($handoverNotes)): ?>
+                            <p class="mb-1"><?php echo nl2br(htmlspecialchars($handoverNotes)); ?></p>
+                        <?php endif; ?>
+                        <?php if ($handoverRequired === 'Y'): ?>
+                            <a href="<?php echo "{$base}html/?s={$s}&ss={$ss}&p=handover_report&applicationID={$targetApplicationID}"; ?>"
+                               class="btn btn-sm btn-outline-secondary mt-1">
+                                <i class="ri-clipboard-line me-1"></i> View detailed handover & tasks
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($targetApplicationDocuments)): ?>
+                    <div class="mb-4">
+                        <h6 class="text-muted text-uppercase small mb-2">
+                            <i class="ri-attachment-2 me-1 text-primary"></i>Supporting Documents
+                        </h6>
+                        <ul class="list-unstyled mb-0 small">
+                            <?php foreach ($targetApplicationDocuments as $doc): ?>
+                                <?php
+                                    $docObj = is_object($doc) ? $doc : (object)$doc;
+                                    $fileName = $docObj->fileName ?? 'Document';
+                                    $filePath = $docObj->filePath ?? '';
+                                    $href = $base . ltrim($filePath, '/');
+                                ?>
+                                <li class="mb-1 d-flex align-items-center">
+                                    <i class="ri-file-line me-2 text-muted"></i>
+                                    <a href="<?php echo htmlspecialchars($href); ?>" target="_blank" class="text-decoration-none">
+                                        <?php echo htmlspecialchars($fileName); ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($targetApprovalStatus && isset($targetApprovalStatus['steps'])):
+
+                    // var_dump($targetApprovalStatus);
+                    ?>
                     <div class="mb-4">
                         <h6 class="text-muted text-uppercase small mb-3">Approval Workflow</h6>
                         <div id="workflowStatusContainer">
                             <?php
                                 $steps = $targetApprovalStatus['steps'];
                                 foreach ($steps as $step):
+                                    // var_dump($step);
                                     $stepID = isset($step['stepID']) ? (int)$step['stepID'] : null;
                                     $stepOrder = isset($step['stepOrder']) ? (int)$step['stepOrder'] : null;
                                     $stepName = isset($step['stepName']) ? htmlspecialchars($step['stepName']) : 'Step ' . $stepOrder;
-                                    $stepStatus = isset($step['status']) ? $step['status'] : 'pending';
+                                    $stepStatus = isset($step['stepStatus']) ? $step['stepStatus'] : 'pending';
+
+
+                                    // var_dump($stepStatus);
                                     $approvers = isset($step['approvers']) ? $step['approvers'] : array();
-                                    $isCurrentUserStep = ($targetApplicationRole && $targetApplicationRole['stepID'] === $stepID);?>
-                                    <div class="workflow-step mb-3 p-3 border rounded <?php echo $isCurrentUserStep ? 'border-primary bg-light' : ''; ?>">
+                                    $isCurrentUserStep = ($targetApplicationRole && $targetApplicationRole['stepID'] == $step['stepID']);?>
+
+                                    <div class="workflow-step mb-3 p-3 border rounded <?php echo $isCurrentUserStep ? 'border-primary bg-primary-subtle text-primary-emphasis' : 'shadow-lg'; ?>">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <h6 class="mb-0">
                                                 <?php echo $stepName; ?>
@@ -489,7 +836,9 @@ function formatDateRange($start, $end)
                                                 <?php echo ucfirst($stepStatus); ?>
                                             </span>
                                         </div>
-                                        <?php if (!empty($approvers)): ?>
+                                        <?php if (!empty($approvers)):
+                                            // var_dump($approvers);
+                                            ?>
                                             <div class="approvers-list">
                                                 <?php foreach ($approvers as $approver): ?>
                                                     <?php
@@ -498,10 +847,28 @@ function formatDateRange($start, $end)
                                                         $hasActed = isset($approver['hasActed']) ? $approver['hasActed'] : false;
                                                         $action = isset($approver['action']) ? $approver['action'] : null;
                                                         $comments = isset($approver['comments']) ? $approver['comments'] : null;
-                                                        $decisionDate = isset($approver['decisionDate']) ? $approver['decisionDate'] : null;
-                                                        $isCurrentUser = ($approverUserID === $userID);
+                                                        $actionDate = isset($approver['actionDate']) ? $approver['actionDate'] : null;
+                                                        $isCurrentUser = ($approverUserID == $userID);
                                                     ?>
-                                                    <div class="approver-item d-flex justify-content-between align-items-start mb-2 p-2 bg-white rounded <?php echo $isCurrentUser ? 'border border-primary' : ''; ?>">
+
+                                                    <!-- Browser-friendly debug output for approver item -->
+                                                    <div class="alert alert-secondary p-2 mb-2 small">
+                                                        <div class="fw-bold mb-1">Approver Debug Info</div>
+                                                        <ul class="mb-1 ps-3">
+                                                            <li><strong>approverUserID: </strong> <?php echo htmlspecialchars($approverUserID); ?></li>
+                                                            <li><strong>approverName: </strong> <?php echo htmlspecialchars($approverName); ?></li>
+                                                            <li><strong>hasActed: </strong> <?php echo htmlspecialchars($hasActed); ?></li>
+                                                            <li><strong>action: </strong> <?php echo htmlspecialchars($action); ?></li>
+                                                            <li><strong>comments: </strong> <?php echo htmlspecialchars($comments); ?></li>
+                                                            <li><strong>actionDate: </strong> <?php echo htmlspecialchars($actionDate); ?></li>
+                                                            <li><strong>isCurrentUser: </strong> <?php echo htmlspecialchars($isCurrentUser); ?></li>
+                                                            <li><strong>Full approver array: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($approver, true)); ?></pre></li>
+                                                            <li><strong>targetApplicationRole: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre></li>
+                                                            <li><strong>step: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($step, true)); ?></pre></li>
+                                                        </ul>
+                                                    </div>
+
+                                                    <div class="approver-item d-flex justify-content-between align-items-start mb-2 p-2 bg-white rounded <?php echo $isCurrentUser ? 'border border-primary shadow-sm' : ''; ?>">
                                                         <div class="flex-grow-1">
                                                             <div class="d-flex align-items-center">
                                                                 <span class="fw-semibold me-2"><?php echo $approverName; ?></span>
@@ -519,10 +886,10 @@ function formatDateRange($start, $end)
                                                             <?php if ($comments): ?>
                                                                 <p class="text-muted small mb-1 mt-1"><?php echo nl2br(htmlspecialchars($comments)); ?></p>
                                                             <?php endif; ?>
-                                                            <?php if ($decisionDate): ?>
+                                                            <?php if ($actionDate): ?>
                                                                 <small class="text-muted">
                                                                     <i class="ri-time-line me-1"></i>
-                                                                    <?php echo date('M j, Y g:i a', strtotime($decisionDate)); ?>
+                                                                    <?php echo date('M j, Y g:i a', strtotime($actionDate)); ?>
                                                                 </small>
                                                             <?php endif; ?>
                                                         </div>
@@ -536,14 +903,40 @@ function formatDateRange($start, $end)
                     </div>
                 <?php endif; ?>
 
-                <?php if ($targetApplicationRole && $targetApplicationRole['canApprove']): ?>
+                <?php
+                    // Check if application has been rejected by any previous approver
+                    $hasBeenRejected = isset($targetApprovalStatus['hasRejection']) && $targetApprovalStatus['hasRejection'];
+
+                    // Determine if current user is HR Manager or Final approver
+                    $isHrManagerOrFinal = false;
+                    if ($targetApplicationRole) {
+                        $isHrManagerOrFinal = $targetApplicationRole['isHrManager'] === true;
+
+                        // Also check if they are final step approver
+                        if (!$isHrManagerOrFinal && isset($targetApprovalStatus['maxStepOrder'])) {
+                            $userStepOrder = $targetApplicationRole['stepOrder'] ?? 0;
+                            $maxStepOrder = $targetApprovalStatus['maxStepOrder'] ?? 0;
+                            $isHrManagerOrFinal = ($userStepOrder >= $maxStepOrder && $maxStepOrder > 0);
+                        }
+                    }
+
+                    // HR Manager/Final approver cannot approve if already rejected by someone else
+                    $canActOnApplication = $targetApplicationRole && $targetApplicationRole['canApprove'];
+                    if ($isHrManagerOrFinal && $hasBeenRejected && $canActOnApplication) {
+                        $canActOnApplication = false;
+                    }
+                ?>
+
+                <?php if ($canActOnApplication): ?>
                     <div class="d-flex gap-2 justify-content-end">
                         <button
                             type="button"
                             class="btn btn-success approval-action"
                             data-action="approve"
                             data-leave-id="<?php echo $targetApplicationID; ?>"
-                            data-employee-name="<?php echo htmlspecialchars($targetEmployeeName, ENT_QUOTES); ?>">
+                            data-employee-name="<?php echo htmlspecialchars($targetEmployeeName, ENT_QUOTES); ?>"
+                            data-step-id="<?php echo isset($targetApplicationRole['stepID']) ? (int)$targetApplicationRole['stepID'] : ''; ?>"
+                            data-step-order="<?php echo isset($targetApplicationRole['stepOrder']) ? (int)$targetApplicationRole['stepOrder'] : ''; ?>">
                             <i class="ri-check-line me-1"></i> Approve
                         </button>
                         <button
@@ -551,9 +944,17 @@ function formatDateRange($start, $end)
                             class="btn btn-danger approval-action"
                             data-action="reject"
                             data-leave-id="<?php echo $targetApplicationID; ?>"
-                            data-employee-name="<?php echo htmlspecialchars($targetEmployeeName, ENT_QUOTES); ?>">
+                            data-employee-name="<?php echo htmlspecialchars($targetEmployeeName, ENT_QUOTES); ?>"
+                            data-step-id="<?php echo isset($targetApplicationRole['stepID']) ? (int)$targetApplicationRole['stepID'] : ''; ?>"
+                            data-step-order="<?php echo isset($targetApplicationRole['stepOrder']) ? (int)$targetApplicationRole['stepOrder'] : ''; ?>">
                             <i class="ri-close-line me-1"></i> Reject
                         </button>
+                    </div>
+                <?php elseif ($isHrManagerOrFinal && $hasBeenRejected): ?>
+                    <div class="alert alert-danger mb-0">
+                        <i class="ri-alert-line me-2"></i>
+                        <strong>Application Already Rejected</strong>
+                        <p class="mb-0 mt-1 small">This application has been rejected by a previous approver in the workflow. You cannot take further action on a rejected application.</p>
                     </div>
                 <?php elseif ($targetApplicationRole && $targetApplicationRole['hasActed']): ?>
                     <div class="alert alert-info mb-0">
@@ -629,6 +1030,12 @@ function formatDateRange($start, $end)
                                     $currentStepOrder = isset($approval['currentStepOrder']) ? (int)$approval['currentStepOrder'] : null;
                                     $maxStepOrder = isset($approval['maxStepOrder']) ? (int)$approval['maxStepOrder'] : null;
 
+                                    // Get rejection status from cache
+                                    $appHasRejection = isset($workflowRejectionCache[$leaveID]) && $workflowRejectionCache[$leaveID];
+
+                                    // Check if current user is HR Manager or final approver for this application
+                                    $userIsHrOrFinal = $isHrManager || ($currentStepOrder >= $maxStepOrder && $maxStepOrder > 0);
+
                                     if ($sourceLabel === 'hr') {
                                         if ($currentStepOrder !== null && $maxStepOrder !== null && $currentStepOrder >= $maxStepOrder) {
                                             $stepLabel = 'Pending HR Manager Approval';
@@ -697,24 +1104,43 @@ function formatDateRange($start, $end)
                                                 data-leave-id="<?php echo $leaveID; ?>">
                                                 <i class="ri-eye-line me-1"></i> View
                                             </button>
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-success approval-action"
-                                                data-action="approve"
-                                                data-leave-id="<?php echo $leaveID; ?>"
-                                                data-employee-name="<?php echo htmlspecialchars($approval['employeeName'] ?? 'Employee', ENT_QUOTES); ?>"
-                                            >
-                                                <i class="ri-check-line me-1"></i> Approve
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-danger approval-action"
-                                                data-action="reject"
-                                                data-leave-id="<?php echo $leaveID; ?>"
-                                                data-employee-name="<?php echo htmlspecialchars($approval['employeeName'] ?? 'Employee', ENT_QUOTES); ?>"
-                                            >
-                                                <i class="ri-close-line me-1"></i> Reject
-                                            </button>
+                                            <?php if ($userIsHrOrFinal && $appHasRejection): ?>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    disabled
+                                                    title="Application has been rejected by a previous approver">
+                                                    <i class="ri-close-circle-line me-1"></i> Already Rejected
+                                                </button>
+                                            <?php else:
+                                                // Get approver role for this specific leave application
+                                                $rowApproverRole = checkUserApproverRole($leaveID, $userID, $DBConn);
+                                                $rowStepID = isset($rowApproverRole['stepID']) ? (int)$rowApproverRole['stepID'] : '';
+                                                $rowStepOrder = isset($rowApproverRole['stepOrder']) ? (int)$rowApproverRole['stepOrder'] : '';
+                                            ?>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-success approval-action"
+                                                    data-action="approve"
+                                                    data-leave-id="<?php echo $leaveID; ?>"
+                                                    data-employee-name="<?php echo htmlspecialchars($approval['employeeName'] ?? 'Employee', ENT_QUOTES); ?>"
+                                                    data-step-id="<?php echo $rowStepID; ?>"
+                                                    data-step-order="<?php echo $rowStepOrder; ?>"
+                                                >
+                                                    <i class="ri-check-line me-1"></i> Approve
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-danger approval-action"
+                                                    data-action="reject"
+                                                    data-leave-id="<?php echo $leaveID; ?>"
+                                                    data-employee-name="<?php echo htmlspecialchars($approval['employeeName'] ?? 'Employee', ENT_QUOTES); ?>"
+                                                    data-step-id="<?php echo $rowStepID; ?>"
+                                                    data-step-order="<?php echo $rowStepOrder; ?>"
+                                                >
+                                                    <i class="ri-close-line me-1"></i> Reject
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -738,6 +1164,8 @@ function formatDateRange($start, $end)
             <div class="modal-body">
                 <input type="hidden" id="modalAction">
                 <input type="hidden" id="modalLeaveID">
+                <input type="hidden" id="modalStepID">
+                <input type="hidden" id="modalStepOrder">
                 <p class="mb-3">
                     <strong>Employee:</strong> <span id="modalEmployeeName"></span><br>
                     <strong>Action:</strong> <span id="modalActionText"></span>
@@ -825,6 +1253,8 @@ function formatDateRange($start, $end)
 
         const modalActionInput = document.getElementById('modalAction');
         const modalLeaveInput = document.getElementById('modalLeaveID');
+        const modalStepIDInput = document.getElementById('modalStepID');
+        const modalStepOrderInput = document.getElementById('modalStepOrder');
         const modalCommentsInput = document.getElementById('modalComments');
         const modalEmployeeText = document.getElementById('modalEmployeeName');
         const modalActionText = document.getElementById('modalActionText');
@@ -856,9 +1286,13 @@ function formatDateRange($start, $end)
 
                 const action = button.dataset.action;
                 const employeeName = button.dataset.employeeName || 'Employee';
+                const stepID = button.dataset.stepId || '';
+                const stepOrder = button.dataset.stepOrder || '';
 
                 modalActionInput.value = action;
                 modalLeaveInput.value = button.dataset.leaveId;
+                if (modalStepIDInput) modalStepIDInput.value = stepID;
+                if (modalStepOrderInput) modalStepOrderInput.value = stepOrder;
                 modalCommentsInput.value = '';
                 modalEmployeeText.textContent = employeeName;
                 modalActionText.textContent = action === 'approve' ? 'Approve leave request' : 'Reject leave request';
@@ -927,6 +1361,18 @@ function formatDateRange($start, $end)
                 formData.append('action', action);
                 formData.append('leaveApplicationID', leaveID);
                 formData.append('comments', comments);
+
+                // Include stepID and stepOrder if available
+                const stepID = modalStepIDInput ? modalStepIDInput.value : '';
+                const stepOrder = modalStepOrderInput ? modalStepOrderInput.value : '';
+                if (stepID) {
+                    formData.append('stepID', stepID);
+                }
+                if (stepOrder) {
+                    formData.append('stepOrder', stepOrder);
+                }
+
+                console.log("Submitting approval:", { action, leaveID, stepID, stepOrder });
 
                 fetch(`${baseUrl}php/scripts/leave/applications/process_leave_approval_action.php`, {
                     method: 'POST',

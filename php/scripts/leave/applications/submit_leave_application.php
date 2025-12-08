@@ -372,10 +372,109 @@ try {
                 $instanceID = Leave::create_approval_instance($leaveApplicationId, $policyID, $DBConn);
 
                 if ($instanceID) {
-                    $approvers = Leave::get_workflow_approvers($policyID, $DBConn);
+                    // Get static approvers from database
+                    $staticApprovers = Leave::get_workflow_approvers($policyID, $DBConn);
+                    if (!is_array($staticApprovers)) {
+                        $staticApprovers = array();
+                    }
 
-                    if (empty($approvers) || !is_array($approvers)) {
-                        $approvers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeId, $DBConn);
+                    // Get workflow steps to identify which steps need dynamic resolution
+                    $workflowSteps = Leave::leave_approval_steps(
+                        array('policyID' => $policyID, 'Suspended' => 'N'),
+                        false,
+                        $DBConn
+                    );
+
+                    // Get step IDs that already have static approvers
+                    $stepsWithApprovers = array();
+                    foreach ($staticApprovers as $approver) {
+                        $stepID = isset($approver['stepID']) ? (int)$approver['stepID'] : null;
+                        if ($stepID) {
+                            $stepsWithApprovers[$stepID] = true;
+                        }
+                    }
+
+                    // Resolve dynamic approvers for steps that don't have static approvers
+                    $dynamicApprovers = array();
+                    if ($workflowSteps && is_array($workflowSteps)) {
+                        foreach ($workflowSteps as $step) {
+                            $stepObj = is_object($step) ? $step : (object)$step;
+                            $stepID = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
+                            $stepType = isset($stepObj->stepType) ? $stepObj->stepType : '';
+
+                            // If this step doesn't have a static approver and has a dynamic type, resolve it
+                            if ($stepID && !isset($stepsWithApprovers[$stepID])) {
+                                $dynamicStepTypes = array('supervisor', 'department_head', 'project_manager', 'hr_manager');
+                                if (in_array($stepType, $dynamicStepTypes, true)) {
+                                    // Resolve this specific step dynamically
+                                    $resolved = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeId, $DBConn);
+                                    if ($resolved && is_array($resolved)) {
+                                        foreach ($resolved as $resolvedApprover) {
+                                            $resolvedStepID = isset($resolvedApprover['stepID']) ? (int)$resolvedApprover['stepID'] : null;
+                                            if ($resolvedStepID === $stepID && !empty($resolvedApprover['approverUserID'])) {
+                                                $dynamicApprovers[] = $resolvedApprover;
+                                                break; // Found approver for this step
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // If no dynamic approvers were found but we have steps with dynamic types, try full resolution
+                    if (empty($dynamicApprovers) && $workflowSteps && is_array($workflowSteps)) {
+                        $hasDynamicSteps = false;
+                        foreach ($workflowSteps as $step) {
+                            $stepObj = is_object($step) ? $step : (object)$step;
+                            $stepType = isset($stepObj->stepType) ? $stepObj->stepType : '';
+                            $stepID = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
+                            if ($stepID && !isset($stepsWithApprovers[$stepID])) {
+                                $dynamicStepTypes = array('supervisor', 'department_head', 'project_manager', 'hr_manager');
+                                if (in_array($stepType, $dynamicStepTypes, true)) {
+                                    $hasDynamicSteps = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if ($hasDynamicSteps) {
+                            $fullDynamicResolved = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeId, $DBConn);
+                            if ($fullDynamicResolved && is_array($fullDynamicResolved)) {
+                                foreach ($fullDynamicResolved as $resolvedApprover) {
+                                    $resolvedStepID = isset($resolvedApprover['stepID']) ? (int)$resolvedApprover['stepID'] : null;
+                                    if ($resolvedStepID && !isset($stepsWithApprovers[$resolvedStepID])) {
+                                        $dynamicApprovers[] = $resolvedApprover;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Merge static and dynamic approvers
+                    $approvers = array_merge($staticApprovers, $dynamicApprovers);
+
+                    // Save dynamic approvers to the approval instance if they don't exist in step_approvers table
+                    if (!empty($dynamicApprovers)) {
+                        foreach ($dynamicApprovers as $dynamicApprover) {
+                            $stepID = isset($dynamicApprover['stepID']) ? (int)$dynamicApprover['stepID'] : null;
+                            $approverUserID = isset($dynamicApprover['approverUserID']) ? (int)$dynamicApprover['approverUserID'] : null;
+
+                            if ($stepID && $approverUserID) {
+                                // Check if this approver already exists for this step
+                                $existingCheck = $DBConn->fetch_all_rows(
+                                    "SELECT approverID FROM tija_leave_approval_step_approvers
+                                     WHERE stepID = ? AND approverUserID = ? AND Suspended = 'N'",
+                                    array(
+                                        array($stepID, 'i'),
+                                        array($approverUserID, 'i')
+                                    )
+                                );
+
+                                // If not exists, create a temporary approver record for this instance
+                                // Note: We don't save to the main table, but we ensure notifications are sent
+                                error_log("Leave submission: Dynamic approver resolved - StepID: {$stepID}, ApproverUserID: {$approverUserID}");
+                            }
+                        }
                     }
 
                     if (!empty($approvers)) {
@@ -490,12 +589,96 @@ try {
                             }
                         }
 
+                        // Fallback: Ensure direct report/supervisor is notified if not already notified
+                        if (!empty($employeeDetails)) {
+                            $directReport = Employee::get_direct_report($employeeDetails->ID, $DBConn);
+                            if ($directReport && isset($directReport->ID)) {
+                                $directReportID = (int)$directReport->ID;
+
+                                // Check if direct report was already notified
+                                if (!in_array($directReportID, $notifiedUserIDs, true)) {
+                                    $directReportName = isset($directReport->FirstName)
+                                        ? ($directReport->FirstName . ' ' . ($directReport->Surname ?? ''))
+                                        : 'Direct Manager';
+
+                                    error_log("Leave submission: Fallback - Notifying direct report (UserID: {$directReportID}) for employee {$employeeId}");
+
+                                    $notificationResult = Notification::create(array(
+                                        'eventSlug' => 'leave_pending_approval',
+                                        'userId' => $directReportID,
+                                        'originatorId' => $employeeId,
+                                        'data' => array(
+                                            'employee_id' => $employeeId,
+                                            'employee_name' => $employeeName,
+                                            'leave_type' => $leaveTypeObj ? $leaveTypeObj->leaveTypeName : 'Leave',
+                                            'start_date' => date('M j, Y', strtotime($startDate)),
+                                            'end_date' => date('M j, Y', strtotime($endDate)),
+                                            'total_days' => $noOfDays,
+                                            'application_id' => $leaveApplicationId,
+                                            'approval_level' => 1,
+                                            'step_name' => 'Direct Line Manager Approval',
+                                            'approver_name' => $directReportName,
+                                            'is_final_step' => false
+                                        ),
+                                        'link' => '?s=user&ss=leave&p=pending_approvals&id=' . $leaveApplicationId,
+                                        'entityID' => $entityId,
+                                        'orgDataID' => $orgDataId,
+                                        'segmentType' => 'leave_application',
+                                        'segmentID' => $leaveApplicationId,
+                                        'priority' => 'high'
+                                    ), $DBConn);
+
+                                    $success = !$notificationResult || !is_array($notificationResult)
+                                        ? (bool)$notificationResult
+                                        : ($notificationResult['success'] ?? true);
+
+                                    if ($success) {
+                                        $notifiedCount++;
+                                        $notifiedUserIDs[] = $directReportID;
+                                        $notificationsSent = true;
+                                        error_log("Leave submission: Fallback notification sent successfully to direct report (UserID: {$directReportID})");
+                                    }
+                                } else {
+                                    error_log("Leave submission: Direct report (UserID: {$directReportID}) already notified");
+                                }
+                            } else {
+                                error_log("Leave submission: No direct report found for employee {$employeeId}");
+                            }
+                        }
+
                         if ($notifiedCount > 0) {
                             $notificationsSent = true;
                         }
 
-                        if (class_exists('LeaveNotifications')) {
-                            LeaveNotifications::notifyLeaveSubmitted($leaveApplicationId, $DBConn);
+                        // Log approver resolution summary
+                        $staticCount = isset($staticApprovers) ? count($staticApprovers) : 0;
+                        $dynamicCount = isset($dynamicApprovers) ? count($dynamicApprovers) : 0;
+                        error_log("Leave submission: Approver resolution summary - Static: {$staticCount}, Dynamic: {$dynamicCount}, Total: " . count($approvers) . ", Notified: {$notifiedCount}");
+
+                        // Send employee confirmation notification only (approvers already notified above)
+                        if (class_exists('Notification')) {
+                            Notification::create(array(
+                                'eventSlug' => 'leave_application_submitted',
+                                'userId' => $employeeId,
+                                'originatorId' => $employeeId,
+                                'data' => array(
+                                    'employee_name' => $employeeName,
+                                    'employee_id' => $employeeId,
+                                    'leave_type' => $leaveTypeObj ? $leaveTypeObj->leaveTypeName : 'Leave',
+                                    'start_date' => date('M j, Y', strtotime($startDate)),
+                                    'end_date' => date('M j, Y', strtotime($endDate)),
+                                    'total_days' => $noOfDays,
+                                    'leave_reason' => $leaveReason ?? 'No reason provided',
+                                    'application_id' => $leaveApplicationId,
+                                    'application_link' => '?s=user&ss=leave&p=my_applications&id=' . $leaveApplicationId
+                                ),
+                                'link' => '?s=user&ss=leave&p=my_applications&id=' . $leaveApplicationId,
+                                'entityID' => $entityId,
+                                'orgDataID' => $orgDataId,
+                                'segmentType' => 'leave_application',
+                                'segmentID' => $leaveApplicationId,
+                                'priority' => 'medium'
+                            ), $DBConn);
                         }
                     }
                 }

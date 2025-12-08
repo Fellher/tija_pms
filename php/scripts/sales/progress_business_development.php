@@ -208,7 +208,7 @@ try {
     $s = isset($_POST['s']) ? Utility::clean_string($_POST['s']) : 'user';
     $ss = isset($_POST['ss']) ? Utility::clean_string($_POST['ss']) : 'sales';
     $webBase = '/pms_skim.co.ke_rev/';  // Adjust if your site is at a different path
-    $returnUrl = "{$webBase}html/?s={$s}&ss={$ss}&p=home_refactored&state=business_development";
+    $returnUrl = "{$webBase}html/?s={$s}&ss={$ss}&p=home&state=business_development";
 
     $response['success'] = false;
     $response['message'] = $e->getMessage();
