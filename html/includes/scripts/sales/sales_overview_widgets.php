@@ -6,8 +6,8 @@
 
 // Get sales data
 $sales = Sales::sales_case_mid([
-    'orgDataID' => $orgDataID, 
-    'entityID' => $entityID, 
+    'orgDataID' => $orgDataID,
+    'entityID' => $entityID,
     'Suspended' => 'N'
 ], false, $DBConn);
 
@@ -24,13 +24,13 @@ if ($sales) {
     foreach ($sales as $sale) {
         $totalCases++;
         $totalPipelineValue += $sale->salesCaseEstimate ?: 0;
-        
+
         if ($sale->saleStage == 'won' || $sale->saleStage == 'closed_won') {
             $wonCases++;
             $totalWonValue += $sale->salesCaseEstimate ?: 0;
         }
     }
-    
+
     if ($totalCases > 0) {
         $avgDealSize = round($totalPipelineValue / $totalCases, 2);
     }
@@ -61,10 +61,10 @@ if ($sales) {
                 'wonCases' => 0
             ];
         }
-        
+
         $salesPersonPerformance[$personName]['totalCases']++;
         $salesPersonPerformance[$personName]['totalValue'] += $sale->salesCaseEstimate ?: 0;
-        
+
         if ($sale->saleStage == 'won' || $sale->saleStage == 'closed_won') {
             $salesPersonPerformance[$personName]['wonCases']++;
             $salesPersonPerformance[$personName]['wonValue'] += $sale->salesCaseEstimate ?: 0;
@@ -101,7 +101,7 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
 ?>
 <!-- Sales Overview Widgets -->
 <div class="container-fluid">
-    
+
     <!-- Key Metrics Row -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-3">
@@ -124,7 +124,7 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card">
                 <div class="card-body">
@@ -145,7 +145,7 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card">
                 <div class="card-body">
@@ -166,7 +166,7 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card">
                 <div class="card-body">
@@ -188,31 +188,39 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
             </div>
         </div>
     </div>
-    
+
     <!-- Charts and Tables Row -->
     <div class="row mb-4">
-        
+
         <!-- Pipeline Overview Chart -->
         <div class="col-xl-8 col-lg-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-pie-chart-line me-2"></i>Sales Pipeline Overview
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Breakdown of pipeline by status (won / active / lost) with weighted percentages.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Use this doughnut to see how value is distributed across outcomes.</div>
                 </div>
                 <div class="card-body">
                     <canvas id="pipelineOverviewChart" height="300"></canvas>
                 </div>
             </div>
         </div>
-        
+
         <!-- Recent Activities -->
         <div class="col-xl-4 col-lg-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-calendar-todo-line me-2"></i>Recent Activities
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Last 30 days of sales activities to gauge engagement momentum.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Tracks meetings, calls, and emails logged in the last 30 days.</div>
                 </div>
                 <div class="card-body">
                     <div class="list-group list-group-flush">
@@ -236,17 +244,21 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
             </div>
         </div>
     </div>
-    
+
     <!-- Performance Tables Row -->
     <div class="row">
-        
+
         <!-- Top Sales People -->
         <div class="col-xl-6 col-lg-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-user-star-line me-2"></i>Top Sales Performers
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Ranks sellers by pipeline and won value to spotlight leaders and coverage.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Sorts by total pipeline; includes cases, won value, and win rate for each seller.</div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -261,9 +273,9 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php 
+                                <?php
                                 $topPerformers = array_slice($salesPersonPerformance, 0, 5, true);
-                                foreach ($topPerformers as $personName => $data): 
+                                foreach ($topPerformers as $personName => $data):
                                     $personWinRate = $data['totalCases'] > 0 ? round(($data['wonCases'] / $data['totalCases']) * 100, 1) : 0;
                                 ?>
                                 <tr>
@@ -293,14 +305,18 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                 </div>
             </div>
         </div>
-        
+
         <!-- Sales Goals Progress -->
         <div class="col-xl-6 col-lg-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-target-line me-2"></i>Sales Goals Progress
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Progress against revenue, volume, and win-rate targets for the period.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Track how close you are to revenue, case volume, and win-rate goals.</div>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -313,7 +329,7 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                         </div>
                         <small class="text-muted"><?= round(($totalWonValue / 1000000) * 100, 1) ?>% of target</small>
                     </div>
-                    
+
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">Cases Target</span>
@@ -324,7 +340,7 @@ $activityTypes = Activity::activity_types_mini([], false, $DBConn);
                         </div>
                         <small class="text-muted"><?= round(($totalCases / 50) * 100, 1) ?>% of target</small>
                     </div>
-                    
+
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">Win Rate Target</span>

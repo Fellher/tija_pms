@@ -1,8 +1,8 @@
 <?php
 
-/* 
+/*
  * This class is used to define the activity class
- * 
+ *
  * @package    Admin
  * @subpackage Admin
  * @category   Admin
@@ -67,7 +67,7 @@ class Activity {
          'Suspended',
          'activityLocation'
       );
-      
+
       $rows = $DBConn->retrieve_db_table_rows('tija_activities', $cols, $whereArr);
       return($single === true) ? ((is_array($rows) && count($rows)=== 1) ? $rows[0] : false) : ((is_array($rows) && count($rows) > 0) ? $rows : false);
    }
@@ -86,7 +86,7 @@ class Activity {
                            'activityName',
                            'durationType',
                            'activityDate',
-                           'activityStartTime',                           
+                           'activityStartTime',
                            'activityDescription',
                            'activityLocation',
                            'activitySegment',
@@ -118,9 +118,9 @@ class Activity {
                            'endDateOccurrenceValue',
                            'recurringEndDate',
                            'activityStatusID',
-                                                  
+
                         );
-      
+
       $activityTypes = array('activityTypeID', 'activityTypeName', 'activityTypeDescription');
       $activityCategories = array('activityCategoryID', 'activityCategoryName', 'activityCategoryDescription');
       $clients = array('clientID', 'clientName', 'clientCode', 'accountOwnerID',  'vatNumber', 'clientDescription');
@@ -131,8 +131,8 @@ class Activity {
       $projects = array('projectID', 'projectName',  'projectOwnerID');
       $projectPhases = array('projectPhaseID', 'projectPhaseName' );
       $projectTasks = array('projectTaskID', 'projectTaskName');
-     
-      
+
+
       $sales = array( 'salesCaseName');
 
       if (count($whereArr) > 0) {
@@ -143,7 +143,7 @@ class Activity {
                } else {
                   $where .= " AND ";
                }
-            
+
                if(in_array($col, $activity)) {
                   $where .= "act.{$col} = ?";
                } elseif (in_array($col, $activityTypes)) {
@@ -175,20 +175,20 @@ class Activity {
          }
       }
 
-      $sql = "SELECT act.*, CONCAT(u.FirstName, ' ', u.Surname) as activityOwnerName, u.Email as activityOwnerEmail, 
+      $sql = "SELECT act.*, CONCAT(u.FirstName, ' ', u.Surname) as activityOwnerName, u.Email as activityOwnerEmail,
       at.activityTypeName, at.activityTypeDescription, at.iconlink as activityTypeIcon,
       ac.activityCategoryName, ac.activityCategoryDescription, ac.iconlink as activityCategoryIcon,
       o.orgName,
       e.entityName, e.entityTypeID, e.entityParentID,
-      s.activityStatusName as activityStatusName, 
+      s.activityStatusName as activityStatusName,
       c.clientName, c.clientCode, c.accountOwnerID,
       sc.salesCaseName,sc.salesPersonID,
       p.projectName,  p.projectOwnerID,
-      pp.projectPhaseName, 
+      pp.projectPhaseName,
       pt.projectTaskName
 
-        FROM tija_activities act 
-        LEFT JOIN people u ON act.activityOwnerID = u.ID 
+        FROM tija_activities act
+        LEFT JOIN people u ON act.activityOwnerID = u.ID
         LEFT JOIN tija_activity_types at ON act.activityTypeID = at.activityTypeID
         LEFT JOIN tija_activity_categories ac ON act.activityCategoryID = ac.activityCategoryID
         LEFT JOIN tija_organisation_data o ON act.orgDataID = o.orgDataID
@@ -199,10 +199,10 @@ class Activity {
         LEFT JOIN tija_projects p  ON act.projectID = p.projectID
         LEFT JOIN tija_project_phases pp ON act.projectPhaseID = pp.projectPhaseID
         LEFT JOIN tija_project_tasks pt ON act.projectTaskID = pt.projectTaskID
-        
-       
-      
-         {$where} 
+
+
+
+         {$where}
       ORDER BY act.activityDate DESC";
       $rows = $DBConn->fetch_all_rows($sql,$params);
       if($rows){
@@ -223,19 +223,20 @@ class Activity {
             foreach ($participantsIDs as $participantID) {
                if(Utility::clean_string($participantID)){
                   $participantDetails = Core::user(['ID'=>$participantID], true, $DBConn);
-                  // var_dump($participantDetails);
-                  $participantName = Core::user_name($participantID, $DBConn);
-                  $participantsDetails[] = (object)[
-                     'name' => $participantName,
-                     'id' => $participantDetails->ID,
-                     'email' => $participantDetails->Email
-                  ];
+                  if ($participantDetails && isset($participantDetails->ID)) {
+                     $participantName = Core::user_name($participantID, $DBConn);
+                     $participantsDetails[] = (object)[
+                        'name'  => $participantName,
+                        'id'    => $participantDetails->ID,
+                        'email' => $participantDetails->Email ?? ''
+                     ];
+                  }
                }
             }
             $rows[$key]->activityParticipantsDetails = $participantsDetails;
          }
-         
-        
+
+
          }
       }
       return($single === true) ? ((is_array($rows) && count($rows)=== 1) ? $rows[0] : false) : ((is_array($rows) && count($rows) > 0) ? $rows : false);
@@ -252,16 +253,16 @@ class Activity {
       $params= array();
       $where= '';
       $rows=array();
-      $activityTypes= array( 'activityTypeID', 
-                              'activityTypeName', 
-                              'activityTypeDescription', 
-                           
-                              'LastUpdate', 
-                              'Lapsed', 
+      $activityTypes= array( 'activityTypeID',
+                              'activityTypeName',
+                              'activityTypeDescription',
+
+                              'LastUpdate',
+                              'Lapsed',
                               'Suspended'
                             );
       $activityCategories= array('activityCategoryID', 'activityCategoryName', 'activityCategoryDescription');
-  
+
       if (count($whereArr) > 0) {
          $i = 0;
          foreach ($whereArr as $col => $val) {
@@ -282,9 +283,9 @@ class Activity {
             $i++;
          }
       }
-  
+
       // var_dump($where);
-   
+
       $sql= "SELECT s.activityTypeID, s.activityTypeName, s.activityTypeDescription,  s.LastUpdate, s.Lapsed, s.Suspended,
       ac.activityCategoryID, ac.activityCategoryName, ac.activityCategoryDescription
       FROM tija_activity_types s
@@ -304,15 +305,15 @@ class Activity {
       $params= array();
       $where= '';
       $rows=array();
-      $activityStatus= array( 'activityStatusID', 
-                                'activityStatusName', 
-                                'activityStatusDescription', 
-                                'LastUpdateByID', 
-                                'LastUpdate', 
-                                'Lapsed', 
+      $activityStatus= array( 'activityStatusID',
+                                'activityStatusName',
+                                'activityStatusDescription',
+                                'LastUpdateByID',
+                                'LastUpdate',
+                                'Lapsed',
                                 'Suspended'
                               );
-  
+
       if (count($whereArr) > 0) {
          $i = 0;
          foreach ($whereArr as $col => $val) {
@@ -331,9 +332,9 @@ class Activity {
             $i++;
          }
       }
-  
+
       // var_dump($where);
-   
+
       $sql= "SELECT s.activityStatusID, s.activityStatusName, s.activityStatusDescription, s.LastUpdateByID, s.LastUpdate, s.Lapsed, s.Suspended
       FROM tija_activity_status s
       {$where}";
@@ -345,21 +346,21 @@ class Activity {
       $params= array();
       $where= '';
       $rows=array();
-      $activityParticipants= array( 
-         
-                              'activityParticipantID', 
-                              'activityID', 
-                              'participantUserID', 
-                              'activityOwnerID', 
+      $activityParticipants= array(
+
+                              'activityParticipantID',
+                              'activityID',
+                              'participantUserID',
+                              'activityOwnerID',
                               'recurring',
                               'recurringInterval',
                               'recurringIntervalUnit',
                               'activityStartDate',
-                              'activityEndDate',                               
+                              'activityEndDate',
                               'LastUpdateByID',
                               'CreatedByID' ,
-                              'LastUpdate', 
-                              'Lapsed', 
+                              'LastUpdate',
+                              'Lapsed',
                               'Suspended'
                            );
       $people= array('ID', 'FirstName', 'Surname', 'Email');
@@ -384,7 +385,7 @@ class Activity {
             $i++;
          }
       }
-   
+
       $sql= "SELECT s.activityParticipantID, s.activityID, s.participantUserID, s.activityOwnerID, s.recurring, s.recurringInterval, s.recurringIntervalUnit, s.activityStartDate, s.activityEndDate, s.LastUpdateByID, s.CreatedByID, s.LastUpdate, s.Lapsed, s.Suspended, CONCAT(p.FirstName, ' ', p.Surname) as participantName, p.Email as participantEmail
 
       FROM tija_activity_participant_assignment s
@@ -398,24 +399,24 @@ class Activity {
       $params= array();
       $where= '';
       $rows=array();
-      $recurringActivityInstances= array( 
-                              'recurringInstanceID', 
+      $recurringActivityInstances= array(
+                              'recurringInstanceID',
                               'DateAdded',
-                              'activityID', 
+                              'activityID',
                               'activityInstanceDate',
                               'activityinstanceStartTime',
-                            
-                              'activityInstanceDurationEndTime',   
+
+                              'activityInstanceDurationEndTime',
                               'instanceCount',
                               'orgDataiD',
-                              'entityID',  
+                              'entityID',
                               'activityStatusID',
                               'activityInstanceOwnerID',
-                              
+
                               'completed',
-                              'LastUpdateByID',                             
-                              'LastUpdate', 
-                              'Lapsed', 
+                              'LastUpdateByID',
+                              'LastUpdate',
+                              'Lapsed',
                               'Suspended'
                            );
       if (count($whereArr) > 0) {
@@ -436,7 +437,7 @@ class Activity {
             $i++;
          }
       }
-   
+
       $sql= "SELECT s.*
 
       FROM tija_recurring_activity_instances s

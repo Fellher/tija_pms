@@ -116,8 +116,13 @@ echo Utility::form_modal_footer();?>
                   }
                }
                $phaseEstimate = (isset($projectPhaseDetails->phaseWorkHrs) && !empty($projectPhaseDetails->phaseWorkHrs)) ? Utility::Time_to_decimal($projectPhaseDetails->phaseWorkHrs,".") : 0;
-               $percentage =  ($phaseTime/$phaseEstimate)*100;
-               $timeLeft = $phaseEstimate-$phaseTime;
+               if ($phaseEstimate > 0) {
+                  $percentage = ($phaseTime / $phaseEstimate) * 100;
+                  $timeLeft = $phaseEstimate - $phaseTime;
+               } else {
+                  $percentage = 0;
+                  $timeLeft = 0;
+               }
             } else {
                $timelog->projectPhaseName= "";
                $timelog->workTypeName= "";

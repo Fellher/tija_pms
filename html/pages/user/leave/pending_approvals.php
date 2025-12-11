@@ -138,70 +138,89 @@ function checkUserApproverRole($leaveApplicationID, $userID, $DBConn) {
 
     // If not found in saved approvers, check dynamic approvers
     if (!$result['isApprover']) {
-        // Get workflow steps to check for dynamic approver types
-        $steps = Leave::leave_approval_steps(
-            array('policyID' => $policyID, 'Suspended' => 'N'),
-            false,
-            $DBConn
-        );
+        // Use resolve_dynamic_workflow_approvers to get accurate stepID and stepOrder
+        $dynamicApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
 
-        if ($steps && count($steps) > 0) {
-            // Get current step from instance
-            $currentStepOrder = isset($inst['currentStepOrder']) ? (int)$inst['currentStepOrder'] : 1;
-            $approvalType = isset($inst['approvalType']) ? $inst['approvalType'] : 'parallel';
-
-            foreach ($steps as $step) {
-                $stepObj = is_object($step) ? $step : (object)$step;
-                $stepType = $stepObj->stepType ?? '';
-                $stepOrder = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
-                $stepID = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
-
-                // For HR managers, check all steps (parallel workflow allows this)
-                // For others, only check current or past steps in sequential workflow
-                if ($approvalType === 'sequential' && $stepType !== 'hr_manager' && $stepOrder > $currentStepOrder) {
-                    continue; // Future steps in sequential workflow
-                }
-
-                // Check if user matches dynamic approver role
-                $isDynamicApprover = false;
-
-                switch ($stepType) {
-                    case 'supervisor':
-                        // Check if user is the employee's supervisor
-                        if (!empty($employee->supervisorID) && (int)$employee->supervisorID === (int)$userID) {
-                            $isDynamicApprover = true;
-                        }
-                        break;
-
-                    case 'department_head':
-                        // Check if user is the employee's department head
-                        $deptHead = Employee::get_employee_department_head($employeeID, $DBConn);
-                        if ($deptHead && !empty($deptHead->ID) && (int)$deptHead->ID === (int)$userID) {
-                            $isDynamicApprover = true;
-                        }
-                        break;
-
-                    case 'project_manager':
-                        // For now, fall back to supervisor check
-                        if (!empty($employee->supervisorID) && (int)$employee->supervisorID === (int)$userID) {
-                            $isDynamicApprover = true;
-                        }
-                        break;
-
-                    case 'hr_manager':
-                        // Check if user is HR manager
-                        if ($isHrManager) {
-                            $isDynamicApprover = true;
-                        }
-                        break;
-                }
-
-
-                if ($isDynamicApprover) {
+        if ($dynamicApprovers && count($dynamicApprovers) > 0) {
+            foreach ($dynamicApprovers as $approver) {
+                $approverUserID = isset($approver['approverUserID']) ? (int)$approver['approverUserID'] : null;
+                if ($approverUserID === $userID) {
                     $result['isApprover'] = true;
-                    $result['stepID'] = $stepID;
-                    $result['stepOrder'] = $stepOrder;
+                    $result['stepID'] = isset($approver['stepID']) ? (int)$approver['stepID'] : null;
+                    $result['stepOrder'] = isset($approver['stepOrder']) ? (int)$approver['stepOrder'] : null;
+
                     break;
+                }
+            }
+        }
+
+        // Fallback: If still not found, check workflow steps manually
+        if (!$result['isApprover']) {
+            // Get workflow steps to check for dynamic approver types
+            $steps = Leave::leave_approval_steps(
+                array('policyID' => $policyID, 'Suspended' => 'N'),
+                false,
+                $DBConn
+            );
+
+            if ($steps && count($steps) > 0) {
+                // Get current step from instance
+                $currentStepOrder = isset($inst['currentStepOrder']) ? (int)$inst['currentStepOrder'] : 1;
+                $approvalType = isset($inst['approvalType']) ? $inst['approvalType'] : 'parallel';
+
+                foreach ($steps as $step) {
+                    $stepObj = is_object($step) ? $step : (object)$step;
+                    $stepType = $stepObj->stepType ?? '';
+                    $stepOrder = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
+                    $stepID = isset($stepObj->stepID) ? (int)$stepObj->stepID : null;
+
+                    // For HR managers, check all steps (parallel workflow allows this)
+                    // For others, only check current or past steps in sequential workflow
+                    if ($approvalType === 'sequential' && $stepType !== 'hr_manager' && $stepOrder > $currentStepOrder) {
+                        continue; // Future steps in sequential workflow
+                    }
+
+                    // Check if user matches dynamic approver role
+                    $isDynamicApprover = false;
+
+                    switch ($stepType) {
+                        case 'supervisor':
+                            // Check if user is the employee's supervisor
+                            if (!empty($employee->supervisorID) && (int)$employee->supervisorID === (int)$userID) {
+                                $isDynamicApprover = true;
+                            }
+                            break;
+
+                        case 'department_head':
+                            // Check if user is the employee's department head
+                            $deptHead = Employee::get_employee_department_head($employeeID, $DBConn);
+                            if ($deptHead && !empty($deptHead->ID) && (int)$deptHead->ID === (int)$userID) {
+                                $isDynamicApprover = true;
+                            }
+                            break;
+
+                        case 'project_manager':
+                            // For now, fall back to supervisor check
+                            if (!empty($employee->supervisorID) && (int)$employee->supervisorID === (int)$userID) {
+                                $isDynamicApprover = true;
+                            }
+                            break;
+
+                        case 'hr_manager':
+                            // Check if user is HR manager
+                            if ($isHrManager) {
+                                $isDynamicApprover = true;
+                            }
+                            break;
+                    }
+
+                    if ($isDynamicApprover) {
+                        $result['isApprover'] = true;
+                        $result['stepID'] = $stepID;
+                        $result['stepOrder'] = $stepOrder;
+                        error_log("checkUserApproverRole - Found dynamic approver (fallback): UserID={$userID}, StepID={$stepID}, StepOrder={$stepOrder}");
+                        break;
+                    }
                 }
             }
         }
@@ -444,18 +463,18 @@ if ($targetApplicationID) {
          * Browser-friendly debug output for target application role
          * targetApplicationRole: <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre>
          */?>
-        <div class="alert alert-secondary p-2 mb-2 small">
+        <!-- <div class="alert alert-secondary p-2 mb-2 small">
             <div class="fw-bold mb-1">Target Application Role Debug Info</div>
             <ul class="mb-1 ps-3">
                 <li><strong>targetApplicationRole: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre></li>
             </ul>
-        </div>
+        </div> -->
         <?php
         // Get workflow approval status
         if ($targetApplicationRole['instanceID'] && $targetApplicationRole['policyID']) {
 
-            var_dump($targetApplicationRole['instanceID']);
-            var_dump($targetApplicationRole['policyID']);
+            // var_dump($targetApplicationRole['instanceID']);
+            // var_dump($targetApplicationRole['policyID']);
             $targetApprovalStatus = Leave::check_workflow_approval_status(
                 $targetApplicationRole['instanceID'],
                 $targetApplicationRole['policyID'],
@@ -553,16 +572,7 @@ function formatDateRange($start, $end)
             $targetAppliedOn = $targetApp['dateApplied'] ? date('M j, Y g:i a', strtotime($targetApp['dateApplied'])) : '-';
         ?>
 
-        <!-- Browser-friendly debug output for target application data -->
-        <div class="alert alert-secondary p-2 mb-2 small">
-            <div class="fw-bold mb-1">Target Application Debug Info</div>
-            <ul class="mb-1 ps-3">
-                <li><strong>targetApp: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApp, true)); ?></pre></li>
-                <li><strong>targetApplicationRole: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre></li>
-                <li><strong>targetApprovalStatus: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApprovalStatus, true)); ?></pre></li>
 
-            </ul>
-        </div>
         <div class="card border-0 shadow-sm mb-4" id="targetApplicationCard">
             <div class="card-header bg-primary text-white">
                 <div class="d-flex justify-content-between align-items-center">
@@ -851,22 +861,7 @@ function formatDateRange($start, $end)
                                                         $isCurrentUser = ($approverUserID == $userID);
                                                     ?>
 
-                                                    <!-- Browser-friendly debug output for approver item -->
-                                                    <div class="alert alert-secondary p-2 mb-2 small">
-                                                        <div class="fw-bold mb-1">Approver Debug Info</div>
-                                                        <ul class="mb-1 ps-3">
-                                                            <li><strong>approverUserID: </strong> <?php echo htmlspecialchars($approverUserID); ?></li>
-                                                            <li><strong>approverName: </strong> <?php echo htmlspecialchars($approverName); ?></li>
-                                                            <li><strong>hasActed: </strong> <?php echo htmlspecialchars($hasActed); ?></li>
-                                                            <li><strong>action: </strong> <?php echo htmlspecialchars($action); ?></li>
-                                                            <li><strong>comments: </strong> <?php echo htmlspecialchars($comments); ?></li>
-                                                            <li><strong>actionDate: </strong> <?php echo htmlspecialchars($actionDate); ?></li>
-                                                            <li><strong>isCurrentUser: </strong> <?php echo htmlspecialchars($isCurrentUser); ?></li>
-                                                            <li><strong>Full approver array: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($approver, true)); ?></pre></li>
-                                                            <li><strong>targetApplicationRole: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($targetApplicationRole, true)); ?></pre></li>
-                                                            <li><strong>step: </strong> <pre class="mb-0 bg-light border rounded p-2"><?php echo htmlspecialchars(print_r($step, true)); ?></pre></li>
-                                                        </ul>
-                                                    </div>
+
 
                                                     <div class="approver-item d-flex justify-content-between align-items-start mb-2 p-2 bg-white rounded <?php echo $isCurrentUser ? 'border border-primary shadow-sm' : ''; ?>">
                                                         <div class="flex-grow-1">
@@ -935,8 +930,8 @@ function formatDateRange($start, $end)
                             data-action="approve"
                             data-leave-id="<?php echo $targetApplicationID; ?>"
                             data-employee-name="<?php echo htmlspecialchars($targetEmployeeName, ENT_QUOTES); ?>"
-                            data-step-id="<?php echo isset($targetApplicationRole['stepID']) ? (int)$targetApplicationRole['stepID'] : ''; ?>"
-                            data-step-order="<?php echo isset($targetApplicationRole['stepOrder']) ? (int)$targetApplicationRole['stepOrder'] : ''; ?>">
+                            data-step-id="<?php echo isset($targetApplicationRole['stepID']) && $targetApplicationRole['stepID'] !== null ? (int)$targetApplicationRole['stepID'] : ''; ?>"
+                            data-step-order="<?php echo isset($targetApplicationRole['stepOrder']) && $targetApplicationRole['stepOrder'] !== null ? (int)$targetApplicationRole['stepOrder'] : ''; ?>">
                             <i class="ri-check-line me-1"></i> Approve
                         </button>
                         <button
@@ -945,8 +940,8 @@ function formatDateRange($start, $end)
                             data-action="reject"
                             data-leave-id="<?php echo $targetApplicationID; ?>"
                             data-employee-name="<?php echo htmlspecialchars($targetEmployeeName, ENT_QUOTES); ?>"
-                            data-step-id="<?php echo isset($targetApplicationRole['stepID']) ? (int)$targetApplicationRole['stepID'] : ''; ?>"
-                            data-step-order="<?php echo isset($targetApplicationRole['stepOrder']) ? (int)$targetApplicationRole['stepOrder'] : ''; ?>">
+                            data-step-id="<?php echo isset($targetApplicationRole['stepID']) && $targetApplicationRole['stepID'] !== null ? (int)$targetApplicationRole['stepID'] : ''; ?>"
+                            data-step-order="<?php echo isset($targetApplicationRole['stepOrder']) && $targetApplicationRole['stepOrder'] !== null ? (int)$targetApplicationRole['stepOrder'] : ''; ?>">
                             <i class="ri-close-line me-1"></i> Reject
                         </button>
                     </div>
@@ -1115,8 +1110,10 @@ function formatDateRange($start, $end)
                                             <?php else:
                                                 // Get approver role for this specific leave application
                                                 $rowApproverRole = checkUserApproverRole($leaveID, $userID, $DBConn);
-                                                $rowStepID = isset($rowApproverRole['stepID']) ? (int)$rowApproverRole['stepID'] : '';
-                                                $rowStepOrder = isset($rowApproverRole['stepOrder']) ? (int)$rowApproverRole['stepOrder'] : '';
+                                                $rowStepID = (isset($rowApproverRole['stepID']) && $rowApproverRole['stepID'] !== null) ? (int)$rowApproverRole['stepID'] : '';
+                                                $rowStepOrder = (isset($rowApproverRole['stepOrder']) && $rowApproverRole['stepOrder'] !== null) ? (int)$rowApproverRole['stepOrder'] : '';
+
+                                                error_log("Table row approver role for leaveID {$leaveID}, userID {$userID}: stepID=" . ($rowStepID ?: 'NULL') . ", stepOrder=" . ($rowStepOrder ?: 'NULL'));
                                             ?>
                                                 <button
                                                     type="button"
@@ -1164,8 +1161,8 @@ function formatDateRange($start, $end)
             <div class="modal-body">
                 <input type="hidden" id="modalAction">
                 <input type="hidden" id="modalLeaveID">
-                <input type="hidden" id="modalStepID">
-                <input type="hidden" id="modalStepOrder">
+                <input type="text" name="modalStepID" class="form-control form-control-sm" id="modalStepID">
+                <input type="text" name="modalStepOrder" class="form-control form-control-sm" id="modalStepOrder">
                 <p class="mb-3">
                     <strong>Employee:</strong> <span id="modalEmployeeName"></span><br>
                     <strong>Action:</strong> <span id="modalActionText"></span>
@@ -1286,8 +1283,16 @@ function formatDateRange($start, $end)
 
                 const action = button.dataset.action;
                 const employeeName = button.dataset.employeeName || 'Employee';
-                const stepID = button.dataset.stepId || '';
-                const stepOrder = button.dataset.stepOrder || '';
+                const stepID = button.dataset.stepId || button.getAttribute('data-step-id') || '';
+                const stepOrder = button.dataset.stepOrder || button.getAttribute('data-step-order') || '';
+
+                console.log("Button clicked - Step info:", {
+                    stepID,
+                    stepOrder,
+                    stepIdAttr: button.dataset.stepId,
+                    stepOrderAttr: button.dataset.stepOrder,
+                    allDataAttrs: Object.keys(button.dataset)
+                });
 
                 modalActionInput.value = action;
                 modalLeaveInput.value = button.dataset.leaveId;
@@ -1362,17 +1367,28 @@ function formatDateRange($start, $end)
                 formData.append('leaveApplicationID', leaveID);
                 formData.append('comments', comments);
 
-                // Include stepID and stepOrder if available
-                const stepID = modalStepIDInput ? modalStepIDInput.value : '';
-                const stepOrder = modalStepOrderInput ? modalStepOrderInput.value : '';
-                if (stepID) {
-                    formData.append('stepID', stepID);
-                }
-                if (stepOrder) {
-                    formData.append('stepOrder', stepOrder);
-                }
+                // Always include stepID and stepOrder (even if empty, backend will handle validation)
+                const stepID = modalStepIDInput ? modalStepIDInput.value.trim() : '';
+                const stepOrder = modalStepOrderInput ? modalStepOrderInput.value.trim() : '';
 
-                console.log("Submitting approval:", { action, leaveID, stepID, stepOrder });
+                // Always append, even if empty - backend needs to know if they were provided
+                formData.append('stepID', stepID);
+                formData.append('stepOrder', stepOrder);
+
+                console.log("Submitting approval:", {
+                    action,
+                    leaveID,
+                    stepID,
+                    stepOrder,
+                    stepIDType: typeof stepID,
+                    stepOrderType: typeof stepOrder,
+                    stepIDLength: stepID.length,
+                    stepOrderLength: stepOrder.length
+                });
+
+                console.log("Form data:", {
+                    formData: Object.fromEntries(formData.entries())
+                });
 
                 fetch(`${baseUrl}php/scripts/leave/applications/process_leave_approval_action.php`, {
                     method: 'POST',

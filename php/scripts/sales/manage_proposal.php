@@ -43,7 +43,7 @@ if ($isValidUser) {
 
    $proposalDeadline = (isset($_POST['proposalDeadline']) && !empty($_POST['proposalDeadline'])) ? Utility::clean_string($_POST['proposalDeadline']) : "";
    // ISO date format check for proposalDeadline
-   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $proposalDeadline)) {
+   if ($proposalDeadline && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $proposalDeadline)) {
        $errors[] = "Invalid proposal deadline format. Please use YYYY-MM-DD.";
    }
    $proposalStatusID = (isset($_POST['proposalStatusID']) && !empty($_POST['proposalStatusID'])) ? Utility::clean_string($_POST['proposalStatusID']) : "";

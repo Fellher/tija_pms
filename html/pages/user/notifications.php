@@ -452,9 +452,8 @@ function showToast(message, type = 'info') {
     if (typeof window.showToast === 'function') {
         window.showToast(message, type);
     } else {
-        // Fallback - should not happen since toast-notifications.js is loaded globally
-        console.warn('showToast not available, falling back to console');
-        console.log(`[${type.toUpperCase()}] ${message}`);
+        // Fallback: simple alert if toast helper is unavailable
+        alert(message);
     }
 }
 

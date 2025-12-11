@@ -53,17 +53,6 @@ class LeaveNotifications {
 
             $results['employee'] = $employeeNotif;
 
-            // Log notification creation for employee
-            if (is_array($employeeNotif) && isset($employeeNotif['notifications'])) {
-                $channelsUsed = array();
-                foreach ($employeeNotif['notifications'] as $notif) {
-                    if (isset($notif['channelSlug'])) {
-                        $channelsUsed[] = $notif['channelSlug'];
-                    }
-                }
-                error_log("LeaveNotifications::notifyLeaveSubmitted - Employee notification created. Channels: " . implode(', ', $channelsUsed) . " for application ID: {$leaveApplicationID}");
-            }
-
             // 2. Notify first level approvers
             $approvers = self::getNextApprovers($leaveApplicationID, $DBConn);
             if (is_array($approvers)) {
@@ -105,7 +94,6 @@ class LeaveNotifications {
             return array('success' => true, 'results' => $results);
 
         } catch (Exception $e) {
-            error_log("Leave notification error: " . $e->getMessage());
             return array('success' => false, 'message' => $e->getMessage());
         }
     }
@@ -184,7 +172,6 @@ class LeaveNotifications {
             );
 
         } catch (Exception $e) {
-            error_log("Leave reminder error: " . $e->getMessage());
             return array('success' => false, 'message' => $e->getMessage());
         }
     }
@@ -274,13 +261,7 @@ class LeaveNotifications {
                             $channelsUsed[] = $notif['channelSlug'];
                         }
                     }
-                    error_log("LeaveNotifications::notifyLeaveApproved - Employee approval notification created. Channels: " . implode(', ', $channelsUsed) . " for application ID: {$leaveApplicationID}");
-
-                    // Check if email channel was included
-                    $hasEmail = in_array('email', $channelsUsed);
-                    if (!$hasEmail) {
-                        error_log("LeaveNotifications::notifyLeaveApproved - WARNING: Email channel not included in notification channels! Application ID: {$leaveApplicationID}, Employee ID: {$leave['employeeID']}");
-                    }
+                    // channel info collected but not logged
                 }
 
                 // Also send direct email notification as fallback/backup
@@ -288,7 +269,7 @@ class LeaveNotifications {
                     try {
                         self::sendLeaveApprovalEmail($leaveApplicationID, $leave, $approverName, $comments, $DBConn);
                     } catch (Exception $e) {
-                        error_log("Failed to send leave approval email: " . $e->getMessage());
+                        // suppress debug logging
                     }
                 }
             } else {
@@ -354,7 +335,6 @@ class LeaveNotifications {
             return array('success' => true, 'results' => $results);
 
         } catch (Exception $e) {
-            error_log("Leave approval notification error: " . $e->getMessage());
             return array('success' => false, 'message' => $e->getMessage());
         }
     }
@@ -403,7 +383,6 @@ class LeaveNotifications {
             return array('success' => true, 'results' => array('employee' => $employeeNotif));
 
         } catch (Exception $e) {
-            error_log("Leave rejection notification error: " . $e->getMessage());
             return array('success' => false, 'message' => $e->getMessage());
         }
     }
@@ -482,7 +461,6 @@ class LeaveNotifications {
             return array('success' => true, 'results' => $results);
 
         } catch (Exception $e) {
-            error_log("Leave cancellation notification error: " . $e->getMessage());
             return array('success' => false, 'message' => $e->getMessage());
         }
     }
@@ -848,7 +826,6 @@ class LeaveNotifications {
             $result = $DBConn->query($sql, $params);
             return $result !== false;
         } catch (Exception $e) {
-            error_log('Error removing pending notifications: ' . $e->getMessage());
             return false;
         }
     }
@@ -894,7 +871,6 @@ class LeaveNotifications {
         global $config;
 
         if (!isset($leave['employeeEmail']) || empty($leave['employeeEmail'])) {
-            error_log("sendLeaveApprovalEmail: No email address for employee");
             return false;
         }
 
@@ -902,7 +878,6 @@ class LeaveNotifications {
             // Check if email helper exists
             $emailHelperPath = __DIR__ . '/../functions/email_helper.php';
             if (!file_exists($emailHelperPath)) {
-                error_log("sendLeaveApprovalEmail: Email helper not found at {$emailHelperPath}");
                 return false;
             }
 
@@ -987,15 +962,12 @@ class LeaveNotifications {
             );
 
             if ($result['success']) {
-                error_log("Leave approval email sent successfully to {$leave['employeeEmail']} for application {$leaveApplicationID}");
                 return true;
             } else {
-                error_log("Failed to send leave approval email: " . $result['message']);
                 return false;
             }
 
         } catch (Exception $e) {
-            error_log("Exception sending leave approval email: " . $e->getMessage());
             return false;
         }
     }

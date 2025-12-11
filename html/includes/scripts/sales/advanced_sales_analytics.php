@@ -11,15 +11,15 @@ $currentYear = date('Y');
 
 // Get sales data for current month
 $currentMonthSales = Sales::sales_case_mid([
-    'orgDataID' => $orgDataID, 
-    'entityID' => $entityID, 
+    'orgDataID' => $orgDataID,
+    'entityID' => $entityID,
     'Suspended' => 'N'
 ], false, $DBConn);
 
 // Get sales data for last month (you might need to add date filtering to the Sales class)
 $lastMonthSales = Sales::sales_case_mid([
-    'orgDataID' => $orgDataID, 
-    'entityID' => $entityID, 
+    'orgDataID' => $orgDataID,
+    'entityID' => $entityID,
     'Suspended' => 'N'
 ], false, $DBConn);
 
@@ -37,13 +37,13 @@ if ($currentMonthSales) {
     foreach ($currentMonthSales as $sale) {
         $currentMonthData['totalCases']++;
         $currentMonthData['totalValue'] += $sale->salesCaseEstimate ?: 0;
-        
+
         if ($sale->saleStage == 'won' || $sale->saleStage == 'closed_won') {
             $currentMonthData['wonValue'] += $sale->salesCaseEstimate ?: 0;
             $currentMonthData['wonCases']++;
         }
     }
-    
+
     if ($currentMonthData['totalCases'] > 0) {
         $currentMonthData['avgDealSize'] = round($currentMonthData['totalValue'] / $currentMonthData['totalCases'], 2);
     }
@@ -67,7 +67,7 @@ if ($currentMonthSales) {
     foreach ($currentMonthSales as $sale) {
         $probability = $sale->probability ?: 0;
         $value = $sale->salesCaseEstimate ?: 0;
-        
+
         if ($probability <= 25) {
             $probabilityRanges['0-25']['count']++;
             $probabilityRanges['0-25']['value'] += $value;
@@ -94,7 +94,7 @@ if ($currentMonthSales) {
         }
         $businessUnitData[$unitName]['count']++;
         $businessUnitData[$unitName]['value'] += $sale->salesCaseEstimate ?: 0;
-        
+
         if ($sale->saleStage == 'won' || $sale->saleStage == 'closed_won') {
             $businessUnitData[$unitName]['wonValue'] += $sale->salesCaseEstimate ?: 0;
         }
@@ -104,7 +104,7 @@ if ($currentMonthSales) {
 
 <!-- Advanced Sales Analytics Container -->
 <div class="container-fluid">
-    
+
     <!-- Key Performance Indicators Row -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6">
@@ -127,7 +127,7 @@ if ($currentMonthSales) {
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -148,7 +148,7 @@ if ($currentMonthSales) {
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -169,7 +169,7 @@ if ($currentMonthSales) {
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -191,31 +191,39 @@ if ($currentMonthSales) {
             </div>
         </div>
     </div>
-    
+
     <!-- Charts Row -->
     <div class="row mb-4">
-        
+
         <!-- Probability Distribution Chart -->
         <div class="col-xl-6 col-lg-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-pie-chart-line me-2"></i>Sales by Probability Range
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Buckets deals by probability to show where value sits across risk bands.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Use to balance focus between high-confidence closes and earlier-stage bets.</div>
                 </div>
                 <div class="card-body">
                     <canvas id="probabilityChart" height="300"></canvas>
                 </div>
             </div>
         </div>
-        
+
         <!-- Business Unit Performance -->
         <div class="col-xl-6 col-lg-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-building-line me-2"></i>Performance by Business Unit
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Compares pipeline, wins, and value by business unit to spot strengths and gaps.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Identify which units need more coverage or coaching to lift win rates.</div>
                 </div>
                 <div class="card-body">
                     <canvas id="businessUnitChart" height="300"></canvas>
@@ -223,17 +231,21 @@ if ($currentMonthSales) {
             </div>
         </div>
     </div>
-    
+
     <!-- Detailed Analytics Tables -->
     <div class="row">
-        
+
         <!-- Probability Analysis Table -->
         <div class="col-xl-6 col-lg-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-bar-chart-box-line me-2"></i>Probability Analysis
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Tabular view of probability buckets with cases, value, and share of pipeline.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Drill into probability bands to plan next actions or re-qualify deals.</div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -248,9 +260,9 @@ if ($currentMonthSales) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php 
+                                <?php
                                 $totalPipelineValue = $currentMonthData['totalValue'];
-                                foreach ($probabilityRanges as $range => $data): 
+                                foreach ($probabilityRanges as $range => $data):
                                     $avgDealSize = $data['count'] > 0 ? round($data['value'] / $data['count'], 0) : 0;
                                     $percentage = $totalPipelineValue > 0 ? round(($data['value'] / $totalPipelineValue) * 100, 1) : 0;
                                 ?>
@@ -279,14 +291,18 @@ if ($currentMonthSales) {
                 </div>
             </div>
         </div>
-        
+
         <!-- Business Unit Performance Table -->
         <div class="col-xl-6 col-lg-12 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-building-2-line me-2"></i>Business Unit Performance
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Side-by-side BU comparison of volume, value, wins, and win rate.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Compare volume, pipeline value, won value, and win rate per BU.</div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -301,7 +317,7 @@ if ($currentMonthSales) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($businessUnitData as $unitName => $data): 
+                                <?php foreach ($businessUnitData as $unitName => $data):
                                     $unitWinRate = $data['value'] > 0 ? round(($data['wonValue'] / $data['value']) * 100, 1) : 0;
                                 ?>
                                 <tr>
@@ -323,7 +339,7 @@ if ($currentMonthSales) {
             </div>
         </div>
     </div>
-    
+
     <!-- Sales Forecasting Widget -->
     <div class="row">
         <div class="col-12">
@@ -357,7 +373,7 @@ if ($currentMonthSales) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Forecast Chart -->
                     <div class="mt-4">
                         <canvas id="forecastChart" height="200"></canvas>
@@ -371,7 +387,7 @@ if ($currentMonthSales) {
 <!-- Chart.js Scripts -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     // Probability Distribution Chart
     const probCtx = document.getElementById('probabilityChart').getContext('2d');
     const probabilityChart = new Chart(probCtx, {
@@ -419,19 +435,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-    
+
     // Business Unit Chart
     const buCtx = document.getElementById('businessUnitChart').getContext('2d');
     const businessUnitChart = new Chart(buCtx, {
         type: 'bar',
         data: {
-            labels: [<?php 
+            labels: [<?php
                 $unitNames = array_keys($businessUnitData);
                 echo "'" . implode("', '", array_map('addslashes', $unitNames)) . "'";
             ?>],
             datasets: [{
                 label: 'Pipeline Value',
-                data: [<?php 
+                data: [<?php
                     $unitValues = array_column($businessUnitData, 'value');
                     echo implode(', ', $unitValues);
                 ?>],
@@ -440,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 borderWidth: 1
             }, {
                 label: 'Won Value',
-                data: [<?php 
+                data: [<?php
                     $unitWonValues = array_column($businessUnitData, 'wonValue');
                     echo implode(', ', $unitWonValues);
                 ?>],
@@ -473,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-    
+
     // Forecast Chart
     const forecastCtx = document.getElementById('forecastChart').getContext('2d');
     const forecastChart = new Chart(forecastCtx, {

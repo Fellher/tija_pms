@@ -23,8 +23,39 @@ try {
     $action = isset($_POST['action']) ? Utility::clean_string($_POST['action']) : '';
     $comments = isset($_POST['comments']) ? Utility::clean_string($_POST['comments']) : null;
     $leaveApplicationID = isset($_POST['leaveApplicationID']) ? (int)$_POST['leaveApplicationID'] : 0;
-    $submittedStepID = isset($_POST['stepID']) && !empty($_POST['stepID']) ? (int)$_POST['stepID'] : null;
-    $submittedStepOrder = isset($_POST['stepOrder']) && !empty($_POST['stepOrder']) ? (int)$_POST['stepOrder'] : null;
+
+    // Get stepID and stepOrder - handle both empty strings and missing values
+    $submittedStepID = null;
+    $submittedStepOrder = null;
+
+    if (isset($_POST['stepID'])) {
+        $stepIDValue = trim($_POST['stepID']);
+        if ($stepIDValue !== '' && $stepIDValue !== '0') {
+            $submittedStepID = (int)$stepIDValue;
+        }
+    }
+
+    if (isset($_POST['stepOrder'])) {
+        $stepOrderValue = trim($_POST['stepOrder']);
+        if ($stepOrderValue !== '' && $stepOrderValue !== '0') {
+            $submittedStepOrder = (int)$stepOrderValue;
+        }
+    }
+
+    error_log("process_leave_approval_action - Received parameters: action={$action}, leaveApplicationID={$leaveApplicationID}, submittedStepID=" . ($submittedStepID ?? 'NULL') . ", submittedStepOrder=" . ($submittedStepOrder ??
+    'NULL') . ", POST[stepID]=" . (isset($_POST['stepID']) ? $_POST['stepID'] : 'NOT_SET') . ", POST[stepOrder]=" . (isset($_POST['stepOrder']) ? $_POST['stepOrder'] : 'NOT_SET'));
+
+    // Debug: capture raw form data to trace submission (matches pending_approvals form)
+    error_log("process_leave_approval_action - FORM DATA: " . json_encode(array(
+        'action' => $action,
+        'leaveApplicationID' => $leaveApplicationID,
+        'comments' => $comments,
+        'stepID_raw' => isset($_POST['stepID']) ? $_POST['stepID'] : 'NOT_SET',
+        'stepOrder_raw' => isset($_POST['stepOrder']) ? $_POST['stepOrder'] : 'NOT_SET',
+        'stepID_parsed' => $submittedStepID,
+        'stepOrder_parsed' => $submittedStepOrder,
+        'userID' => $userDetails->ID ?? null,
+    )));
 
     // Validate inputs
     if (empty($action) || $leaveApplicationID === 0) {
@@ -155,6 +186,9 @@ try {
             }
 
             // PRIORITY 1: Use submitted stepID and stepOrder if provided (from form)
+            // DEBUG: track start of approval resolution
+            error_log("process_leave_approval_action - START RESOLUTION: userID={$userID}, submittedStepID=" . ($submittedStepID ?? 'NULL') . ", submittedStepOrder=" . ($submittedStepOrder ?? 'NULL'));
+
             if ($submittedStepID && $submittedStepOrder) {
                 // Validate that the submitted step exists in the policy
                 $stepValidation = Leave::leave_approval_steps(
@@ -176,8 +210,8 @@ try {
                     if ($employee) {
                         $dynamicApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
                         foreach ($dynamicApprovers as $approver) {
-                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID
-                                && isset($approver['stepID']) && (int)$approver['stepID'] === $submittedStepID) {
+                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] == $userID
+                                && isset($approver['stepID']) && (int)$approver['stepID'] == $submittedStepID) {
                                 $isAuthorized = true;
                                 break;
                             }
@@ -188,8 +222,8 @@ try {
                     if (!$isAuthorized) {
                         $staticApprovers = Leave::get_workflow_approvers($policyID, $DBConn);
                         foreach ($staticApprovers as $approver) {
-                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID
-                                && isset($approver['stepID']) && (int)$approver['stepID'] === $submittedStepID) {
+                            if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] == $userID
+                                && isset($approver['stepID']) && (int)$approver['stepID'] == $submittedStepID) {
                                 $isAuthorized = true;
                                 break;
                             }
@@ -199,22 +233,28 @@ try {
                     if ($isAuthorized) {
                         $stepID = $submittedStepID;
                         $stepOrder = $submittedStepOrder;
-                        error_log("Using submitted step information (VALIDATED): StepID: {$stepID}, StepOrder: {$stepOrder} for User {$userID}");
+                        error_log("process_leave_approval_action - USING SUBMITTED STEP (validated): stepID={$stepID}, stepOrder={$stepOrder}, userID={$userID}");
                     } else {
-                        error_log("WARNING: User {$userID} not authorized for submitted stepID {$submittedStepID}. Will re-identify approver.");
+                        error_log("process_leave_approval_action - SUBMITTED STEP NOT AUTHORIZED: userID={$userID}, stepID={$submittedStepID}, stepOrder={$submittedStepOrder}. Re-identifying approver.");
                         $stepID = null;
                         $stepOrder = null;
                     }
                 } else {
-                    error_log("WARNING: Submitted stepID {$submittedStepID} not found in policy {$policyID}. Will re-identify approver.");
+                    error_log("process_leave_approval_action - SUBMITTED STEP NOT FOUND in policy {$policyID}: stepID={$submittedStepID}, stepOrder={$submittedStepOrder}. Re-identifying approver.");
                     $stepID = null;
                     $stepOrder = null;
                 }
             }
-
+            error_log("--------------------------------");
+            error_log("process_leave_approval_action - stepID: " . $stepID . ", stepOrder: " . $stepOrder);
+            error_log("process_leave_approval_action - END RESOLUTION: userID={$userID}, stepID=" . ($stepID ?? 'NULL') . ", stepOrder=" . ($stepOrder ?? 'NULL'));
+            error_log("--------------------------------");
             // PRIORITY 2: If no submitted step info, check dynamic approvers FIRST, then static approvers
             // This ensures dynamic workflows (supervisor, department_head, etc.) are processed first
             if ((!$stepID || !$stepOrder)) {
+                error_log("--------------------------------");
+                error_log("process_leave_approval_action - NO SUBMITTED STEP INFO: userID={$userID}, stepID=" . ($stepID ?? 'NULL') . ", stepOrder=" . ($stepOrder ?? 'NULL'));
+                error_log("--------------------------------");
                 // Get employee if not already retrieved
                 if (!$employee && $employeeID) {
                     $employee = Employee::employees(array('ID' => $employeeID), true, $DBConn);
@@ -226,12 +266,12 @@ try {
 
                     // Step 1: Resolve dynamic approvers first
                     $dynamicApprovers = Leave::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
-                    error_log("Resolved dynamic approvers for employee {$employeeID}: " . count($dynamicApprovers) . " approver(s)");
+                    error_log("process_leave_approval_action - DYNAMIC approvers resolved: employeeID={$employeeID}, count=" . count($dynamicApprovers));
 
                     // Verify dynamic approvers have stepID and stepOrder
                     foreach ($dynamicApprovers as &$dynApprover) {
                         if (!isset($dynApprover['stepID']) || !isset($dynApprover['stepOrder'])) {
-                            error_log("WARNING: Dynamic approver missing stepID or stepOrder: " . json_encode($dynApprover));
+                            error_log("process_leave_approval_action - WARNING dynamic approver missing step info: " . json_encode($dynApprover));
                         }
                     }
                     unset($dynApprover);
@@ -244,7 +284,7 @@ try {
                             if ($approverStepID && $approverStepOrder) {
                                 $stepID = $approverStepID;
                                 $stepOrder = $approverStepOrder;
-                                error_log("Found approver in DYNAMIC list (PRIORITY): User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}");
+                                error_log("process_leave_approval_action - MATCH dynamic list: userID={$userID}, stepID={$stepID}, stepOrder={$stepOrder}");
                                 break;
                             }
                         }
@@ -253,7 +293,7 @@ try {
                     // Step 3: Only check static approvers if not found in dynamic approvers
                     if (!$stepID || !$stepOrder) {
                         $staticApprovers = Leave::get_workflow_approvers($policyID, $DBConn);
-                        error_log("Checking static approvers (fallback): " . count($staticApprovers) . " approver(s)");
+                        error_log("process_leave_approval_action - STATIC approvers fallback: count=" . count($staticApprovers));
 
                         foreach ($staticApprovers as $approver) {
                             if (isset($approver['approverUserID']) && (int)$approver['approverUserID'] === $userID) {
@@ -262,7 +302,7 @@ try {
                                 if ($approverStepID && $approverStepOrder) {
                                     $stepID = $approverStepID;
                                     $stepOrder = $approverStepOrder;
-                                    error_log("Found approver in STATIC list (fallback): User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}");
+                                    error_log("process_leave_approval_action - MATCH static list: userID={$userID}, stepID={$stepID}, stepOrder={$stepOrder}");
                                     break;
                                 }
                             }
@@ -317,7 +357,7 @@ try {
                     if ($isDynamicApprover && $stepIDVal) {
                         $stepID = $stepIDVal;
                         $stepOrder = $stepOrderVal;
-                        error_log("Dynamic approver matched by step type: User {$userID} is {$stepType} for employee {$employeeID}, step {$stepID}, order {$stepOrder}");
+                        error_log("process_leave_approval_action - MATCH step type: userID={$userID}, stepType={$stepType}, employeeID={$employeeID}, stepID={$stepID}, stepOrder={$stepOrder}");
                         break;
                     }
                 }
@@ -411,6 +451,15 @@ try {
 
             // Record the action (both approve and reject)
             // CRITICAL: Both stepID and stepOrder must be present for approval actions
+            error_log("stepID: " . $stepID . ", stepOrder: " . $stepOrder);
+            error_log("checking processing approval action: User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}, Action: {$action}");
+            /* output the stepID and stepOrder in json format here and stop the process
+            echo json_encode(array(
+                'stepID' => $stepID,
+                'stepOrder' => $stepOrder
+            ));
+            exit;
+            */
             if ($stepID && $stepOrder) {
                 error_log("Processing approval action: User {$userID}, StepID: {$stepID}, StepOrder: {$stepOrder}, Action: {$action}");
                 // Get approver ID from step approvers table
@@ -514,7 +563,7 @@ try {
                 }
             } else {
                 $errorMsg = "Missing step information for approval action. stepID: " . ($stepID ?? 'NULL') . ", stepOrder: " . ($stepOrder ?? 'NULL') . ", UserID: {$userID}, LeaveApplicationID: {$leaveApplicationID}";
-                error_log("ERROR: " . $errorMsg);
+                error_log("ERROR Message: " . $errorMsg);
 
                 // Try one more time to resolve if we have employee info
                 if ($employee && !$stepID) {

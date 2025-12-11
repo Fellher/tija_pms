@@ -319,6 +319,25 @@ if($allSales) {
 }
 
 // ============================================================================
+// DASHBOARD METRICS FOR HEADER CARDS
+// ============================================================================
+$totalClients = is_array($clients) ? count($clients) : 0;
+$inHouseClients = 0;
+$externalClients = 0;
+if ($clients && is_array($clients)) {
+    foreach ($clients as $client) {
+        if (($client->inHouse ?? 'N') === 'Y') {
+            $inHouseClients++;
+        } else {
+            $externalClients++;
+        }
+    }
+}
+$recentClientsCount = $newClients ? count(array_unique($newClients)) : 0;
+$activeProjectsCount = $clientActiveProjects ? count($clientActiveProjects) : 0;
+$hotProspectsCount = $prospects ? count($prospects) : 0;
+
+// ============================================================================
 // MODAL DIALOGS SETUP
 // ============================================================================
 
@@ -348,6 +367,8 @@ if ($permissions['canBulkUpload']) {
 // var_dump($clients[0]);
 // Include organization/entity validation modal
 include "includes/scripts/check_org_entity.php";
+// Client wizard modal
+include "includes/scripts/clients/modals/manage_client_wizard.php";
 
 ?>
 
@@ -356,62 +377,125 @@ include "includes/scripts/check_org_entity.php";
      ============================================================================ -->
 
 <!-- Page Header with Title and Action Buttons -->
-<div class="d-md-flex d-block align-items-center justify-content-between my-4 page-header-breadcrumb">
-    <div>
-        <div class="d-flex align-items-center gap-2">
-            <h1 class="page-title fw-medium fs-24 mb-1">Customer Dashboard</h1>
-            <button type="button"
-                    class="btn btn-sm btn-link text-primary p-0"
-                    data-bs-toggle="modal"
-                    data-bs-target="#clientDocumentationModal"
-                    title="View client management documentation">
-                <i class="ri-information-line fs-20"></i>
-            </button>
+<div class="card shadow-sm border-0 client-hero mb-4">
+    <div class="card-body p-4 p-lg-5">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge text-bg-light text-uppercase fw-semibold px-3 py-2 letter-spacing-sm">Customers</span>
+                    <button type="button"
+                            class="btn btn-sm btn-link text-white p-0"
+                            data-bs-toggle="modal"
+                            data-bs-target="#clientDocumentationModal"
+                            title="View client management documentation">
+                        <i class="ri-information-line fs-20"></i>
+                    </button>
+                </div>
+                <h1 class="page-title fw-semibold fs-28 mb-2 text-white">Customer Command Center</h1>
+                <p class="text-white-75 mb-0">
+                    Enterprise-grade cockpit to manage relationships, watch pipeline health, and act quickly.
+                </p>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <span class="metric-chip">
+                        <i class="ri-team-line me-1"></i>
+                        Total: <strong><?= $totalClients ?></strong>
+                    </span>
+                    <span class="metric-chip">
+                        <i class="ri-building-4-line me-1"></i>
+                        In House: <strong><?= $inHouseClients ?></strong>
+                    </span>
+                    <span class="metric-chip">
+                        <i class="ri-external-link-line me-1"></i>
+                        External: <strong><?= $externalClients ?></strong>
+                    </span>
+                    <span class="metric-chip">
+                        <i class="ri-flashlight-line me-1"></i>
+                        New 30d: <strong><?= $recentClientsCount ?></strong>
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 hero-actions">
+                <?php if ($permissions['canAddClients']): ?>
+                <button type="button"
+                        class="btn btn-primary text-white shadow-sm d-flex align-items-center gap-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#clientWizardModal"
+                        title="Multi-step client intake wizard">
+                    <i class="ri-magic-line"></i>
+                    Client Wizard
+                </button>
+                <button type="button"
+                        class="btn btn-light text-primary shadow-sm d-flex align-items-center gap-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#manage_client_modal"
+                        title="Add new client to the system">
+                    <i class="ri-add-circle-line"></i>
+                    Add Client
+                </button>
+                <?php endif; ?>
+
+                <?php if ($permissions['canBulkUpload']): ?>
+                <button type="button"
+                        class="btn btn-outline-light text-white d-flex align-items-center gap-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#manage_client_upload_modal"
+                        title="Upload multiple clients from file">
+                    <i class="ri-upload-2-line"></i>
+                    Upload
+                </button>
+                <?php endif; ?>
+
+                <?php if ($permissions['canExportData']): ?>
+                <button type="button"
+                        class="btn btn-outline-light text-white d-flex align-items-center gap-2"
+                        id="exportClientsBtn"
+                        title="Export client data">
+                    <i class="ri-download-cloud-2-line"></i>
+                    Export
+                </button>
+                <?php endif; ?>
+            </div>
         </div>
-        <p class="text-muted mb-0">Manage and track all client relationships and activities</p>
-    </div>
-    <div class="ms-md-1 ms-0">
-        <!-- Primary Action: Add New Client -->
-        <?php if ($permissions['canAddClients']): ?>
-        <button type="button"
-                class="btn btn-primary-light shadow btn-sm px-4 me-3"
-                data-bs-toggle="modal"
-                data-bs-target="#manage_client_modal"
-                title="Add new client to the system">
-            <i class="ri-add-line"></i>
-            Add Client
-        </button>
-        <?php endif; ?>
 
-        <!-- Secondary Action: Bulk Upload (if enabled) -->
-        <?php if ($permissions['canBulkUpload']): ?>
-        <button type="button"
-                class="btn btn-secondary-light shadow btn-sm px-4 me-3"
-                data-bs-toggle="modal"
-                data-bs-target="#manage_client_upload_modal"
-                title="Upload multiple clients from file">
-            <i class="ri-upload-line"></i>
-            Upload Clients
-        </button>
-        <?php endif; ?>
-
-        <!-- Export Button (if enabled) -->
-        <?php if ($permissions['canExportData']): ?>
-        <button type="button"
-                class="btn btn-success-light shadow btn-sm px-4"
-                id="exportClientsBtn"
-                title="Export client data">
-            <i class="ri-download-line"></i>
-            Export
-        </button>
-        <?php endif; ?>
+        <div class="row g-3 mt-4">
+            <div class="col-6 col-lg-3">
+                <div class="mini-kpi">
+                    <p class="text-white-75 mb-1 small">Active Projects</p>
+                    <h4 class="text-white mb-0"><?= $activeProjectsCount ?></h4>
+                    <span class="text-white-50 small">Linked to clients</span>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="mini-kpi">
+                    <p class="text-white-75 mb-1 small">Hot Prospects (30d)</p>
+                    <h4 class="text-white mb-0"><?= $hotProspectsCount ?></h4>
+                    <span class="text-white-50 small">Close probability ≥ 50%</span>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="mini-kpi">
+                    <p class="text-white-75 mb-1 small">In-House Mix</p>
+                    <h4 class="text-white mb-0">
+                        <?= $totalClients > 0 ? round(($inHouseClients / $totalClients) * 100) : 0 ?>%
+                    </h4>
+                    <span class="text-white-50 small">Portfolio composition</span>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="mini-kpi">
+                    <p class="text-white-75 mb-1 small">Recently Added</p>
+                    <h4 class="text-white mb-0"><?= $recentClientsCount ?></h4>
+                    <span class="text-white-50 small">Last 30 days</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Include KPI Dashboard for Client Metrics -->
 <?php if ($config['client']['showKPIs']):
       // var_dump($clients);
-   include "includes/scripts/clients/clients_header_kpis.php"; ?>
+   //include "includes/scripts/clients/clients_header_kpis.php"; ?>
 <?php endif; ?>
 
 <!-- ============================================================================
@@ -419,41 +503,70 @@ include "includes/scripts/check_org_entity.php";
      ============================================================================ -->
 
 <!-- Main Client Listing Table -->
-<div class="card card-body">
-    <!-- Table Header with Search and Filter Options -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="d-flex align-items-center">
-            <h5 class="mb-0 me-3">Client Directory</h5>
-            <span class="badge bg-primary-transparent">
-                <?= is_array($clients) ? count($clients) : 0 ?> Total Clients
-            </span>
-        </div>
-
-        <!-- Search and Filter Controls -->
-        <div class="d-flex align-items-center">
-            <?php if ($config['client']['enableSearch']): ?>
-            <div class="input-group me-3" style="width: 300px;">
-                <span class="input-group-text">
-                    <i class="ri-search-line"></i>
-                </span>
-                <input type="text"
-                       class="form-control"
-                       id="clientSearchInput"
-                       placeholder="Search clients...">
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <!-- Table Header with Search and Filter Options -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h5 class="mb-0">Client Directory</h5>
+                    <span class="badge bg-primary-transparent">
+                        <?= is_array($clients) ? count($clients) : 0 ?> Total Clients
+                    </span>
+                    <span class="badge bg-white text-primary border border-primary-subtle d-none" id="activeFiltersBadge"></span>
+                </div>
+                <p class="text-muted small mb-0">Segment clients by ownership, activity, and recency. Use search or quick filters to jump to the right slice.</p>
             </div>
-            <?php endif; ?>
 
-            <?php if ($config['client']['enableAdvancedFiltering']): ?>
-            <button type="button"
-                    class="btn btn-outline-secondary btn-sm me-2"
-                    id="filterToggleBtn"
-                    title="Advanced filters">
-                <i class="ri-filter-line"></i>
-                Filter
-            </button>
-            <?php endif; ?>
+            <!-- Search and Filter Controls -->
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <?php if ($config['client']['enableSearch']): ?>
+                <div class="input-group search-pill">
+                    <span class="input-group-text">
+                        <i class="ri-search-line"></i>
+                    </span>
+                    <input type="text"
+                           class="form-control"
+                           id="clientSearchInput"
+                           placeholder="Search clients, owners, locations...">
+                    <button class="btn btn-light" type="button" id="clearSearchBtn" title="Clear search">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($config['client']['enableAdvancedFiltering']): ?>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        id="filterToggleBtn"
+                        title="Advanced filters">
+                    <i class="ri-filter-line"></i>
+                    Filters
+                </button>
+                <?php endif; ?>
+            </div>
         </div>
-    </div>
+
+        <!-- Quick filter chips -->
+        <?php if ($config['client']['enableAdvancedFiltering']): ?>
+        <div class="d-flex flex-wrap gap-2 mb-3 filter-chip-group" id="clientQuickFilters">
+            <button class="btn btn-filter-chip active" data-filter="all">
+                <i class="ri-equalizer-line me-1"></i>All clients
+            </button>
+            <button class="btn btn-filter-chip" data-filter="inhouse">
+                <i class="ri-building-4-line me-1"></i>In House
+            </button>
+            <button class="btn btn-filter-chip" data-filter="external">
+                <i class="ri-external-link-line me-1"></i>External
+            </button>
+            <button class="btn btn-filter-chip" data-filter="recent">
+                <i class="ri-time-line me-1"></i>Added last 30d
+            </button>
+            <button class="btn btn-filter-chip" data-filter="active">
+                <i class="ri-fire-line me-1"></i>Active cases
+            </button>
+        </div>
+        <?php endif; ?>
 
     <!-- Advanced Filter Panel (Collapsible) -->
     <?php if ($config['client']['enableAdvancedFiltering']):
@@ -549,6 +662,8 @@ include "includes/scripts/check_org_entity.php";
                 <?php
                 if($clients && is_array($clients)) {
                     foreach ($clients as $client) {
+
+                        // var_dump($client);
                         // Determine styling for in-house clients
                         $inhouse = ($client->inHouse == 'Y') ? "table-danger bg-light-blue" : "";
 
@@ -557,6 +672,8 @@ include "includes/scripts/check_org_entity.php";
                             'clientID' => $client->clientID,
                             'headquarters' => 'Y'
                         ), true, $DBConn);
+
+                        // var_dump($addressDetails);
 
                         // Get country information
                         $country = $addressDetails ? Data::countries(array(
@@ -615,14 +732,15 @@ include "includes/scripts/check_org_entity.php";
 
                             <!-- Location Column -->
                             <td>
-                                <?php if ($addressDetails): ?>
-                                <div class="d-flex align-items-center">
-                                    <i class="ri-map-pin-line text-muted me-1"></i>
-                                    <span class="text-muted">
-                                        <?= htmlspecialchars($addressDetails->city) ?>
-                                        <?= isset($country->countryName) ? '/ ' . htmlspecialchars($country->countryName) : '' ?>
-                                    </span>
-                                </div>
+                                <?php
+                                if ($addressDetails): ?>
+                                    <div class="d-flex align-items-center">
+                                        <i class="ri-map-pin-line text-muted me-1"></i>
+                                        <span class="text-muted">
+                                            <?= htmlspecialchars($addressDetails->city) ?>
+                                            <?= isset($country->countryName) ? '/ ' . htmlspecialchars($country->countryName) : '' ?>
+                                        </span>
+                                    </div>
                                 <?php else: ?>
                                 <span class="text-muted">Not specified</span>
                                 <?php endif; ?>
@@ -728,6 +846,8 @@ include "includes/scripts/check_org_entity.php";
         </div>
     </div>
 </div>
+</div>
+
 
 <!-- ============================================================================
      JAVASCRIPT FUNCTIONALITY
@@ -749,6 +869,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredRows = [...allTableRows];
     let currentPage = 1;
     let itemsPerPage = <?= $config['client']['itemsPerPage'] ?>;
+    let quickFilterMode = 'all';
+
+    const activeFiltersBadge = document.getElementById('activeFiltersBadge');
+    const quickFilterButtons = document.querySelectorAll('#clientQuickFilters .btn-filter-chip');
 
     // Initialize table display
     function initializeTable() {
@@ -1101,6 +1225,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php if ($config['client']['enableSearch']): ?>
     // Enhanced search functionality with debounce (500ms delay after user stops typing)
     const searchInput = document.getElementById('clientSearchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
     let searchTimeout = null;
 
     // Debounce function to delay search execution
@@ -1167,6 +1292,17 @@ document.addEventListener('DOMContentLoaded', function() {
             this.placeholder = 'Search clients...';
         });
     }
+
+    if (clearSearchBtn && searchInput) {
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            filteredRows = [...allTableRows];
+            currentPage = 1;
+            updateTableDisplay();
+            updatePagination();
+            updateBottomPagination();
+        });
+    }
     <?php endif; ?>
 
     // ============================================================================
@@ -1204,6 +1340,55 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    // Quick filter chips
+    if (quickFilterButtons && quickFilterButtons.length) {
+        quickFilterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                quickFilterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                quickFilterMode = this.dataset.filter || 'all';
+                syncQuickFilterSelects(quickFilterMode);
+                applyAdvancedFilters();
+            });
+        });
+    }
+
+    function syncQuickFilterSelects(mode) {
+        const clientTypeSelect = document.getElementById('clientTypeFilter');
+        const dateAddedSelect = document.getElementById('dateAddedFilter');
+        const activityLevelSelect = document.getElementById('activityLevelFilter');
+
+        if (!clientTypeSelect || !dateAddedSelect || !activityLevelSelect) return;
+
+        switch(mode) {
+            case 'inhouse':
+                clientTypeSelect.value = 'Y';
+                dateAddedSelect.value = '';
+                activityLevelSelect.value = '';
+                break;
+            case 'external':
+                clientTypeSelect.value = 'N';
+                dateAddedSelect.value = '';
+                activityLevelSelect.value = '';
+                break;
+            case 'recent':
+                clientTypeSelect.value = '';
+                dateAddedSelect.value = 'last30';
+                activityLevelSelect.value = '';
+                break;
+            case 'active':
+                clientTypeSelect.value = '';
+                dateAddedSelect.value = '';
+                activityLevelSelect.value = '';
+                break;
+            default:
+                clientTypeSelect.value = '';
+                dateAddedSelect.value = '';
+                activityLevelSelect.value = '';
+                break;
+        }
+    }
 
     // Clear filters
     const clearFiltersBtn = document.getElementById('clearFiltersBtn');
@@ -1309,6 +1494,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Apply quick filter specific logic
+        if (quickFilterMode === 'active') {
+            filteredRows = filteredRows.filter(row => {
+                const activityCell = row.querySelector('td:nth-child(5)');
+                const badge = activityCell ? activityCell.querySelector('.badge') : null;
+                const activityCount = badge ? parseInt(badge.textContent) || 0 : 0;
+                return activityCount > 0;
+            });
+        }
+
         // Reset to first page and update display
         currentPage = 1;
         updateTableDisplay();
@@ -1331,6 +1526,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (accountOwner) activeFilters++;
         if (activityLevel) activeFilters++;
         if (dateAdded) activeFilters++;
+        if (quickFilterMode && quickFilterMode !== 'all') activeFilters++;
 
         // Update filter button text to show active count
         const filterToggleBtn = document.getElementById('filterToggleBtn');
@@ -1343,6 +1539,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 filterToggleBtn.innerHTML = `<i class="ri-filter-line"></i> Filter`;
                 filterToggleBtn.classList.add('btn-outline-secondary');
                 filterToggleBtn.classList.remove('btn-primary');
+            }
+        }
+
+        if (activeFiltersBadge) {
+            if (activeFilters > 0) {
+                activeFiltersBadge.classList.remove('d-none');
+                activeFiltersBadge.textContent = `${activeFilters} active filter${activeFilters > 1 ? 's' : ''}`;
+            } else {
+                activeFiltersBadge.classList.add('d-none');
+                activeFiltersBadge.textContent = '';
             }
         }
     }
@@ -1360,6 +1566,14 @@ document.addEventListener('DOMContentLoaded', function() {
             searchInput.value = '';
         }
 
+        // Reset quick filters
+        quickFilterMode = 'all';
+        if (quickFilterButtons && quickFilterButtons.length) {
+            quickFilterButtons.forEach(btn => btn.classList.remove('active'));
+            const firstBtn = document.querySelector('#clientQuickFilters .btn-filter-chip');
+            if (firstBtn) firstBtn.classList.add('active');
+        }
+
         // Reset filtered rows to show all
         filteredRows = Array.from(allTableRows);
 
@@ -1372,6 +1586,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update filter indicators
         updateFilterIndicators();
     }
+
+    // Initialize indicators on load
+    updateFilterIndicators();
     <?php endif; ?>
 
     // ============================================================================
@@ -1532,6 +1749,105 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <style>
 /* Custom styles for enhanced user experience */
+.client-hero {
+    background: linear-gradient(135deg, #1f3b73 0%, #2b59c3 35%, #2563eb 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.client-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 30%),
+                radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08), transparent 28%);
+    pointer-events: none;
+}
+
+.hero-actions .btn {
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+}
+
+.metric-chip {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.mini-kpi {
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(0, 21, 54, 0.35);
+    color: #f8fafc;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+}
+
+.mini-kpi h4 {
+    color: #fff;
+}
+
+.mini-kpi p,
+.mini-kpi span {
+    color: rgba(248,250,252,0.9);
+}
+
+.text-white-75 {
+    color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.letter-spacing-sm {
+    letter-spacing: 0.05em;
+}
+
+.search-pill {
+    border-radius: 999px;
+    background: #f8f9fa;
+    overflow: hidden;
+    border: 1px solid #e9ecef;
+}
+
+.search-pill .form-control,
+.search-pill .input-group-text,
+.search-pill .btn {
+    border: none;
+    background: transparent;
+}
+
+.search-pill .form-control:focus {
+    box-shadow: none;
+}
+
+.filter-chip-group .btn-filter-chip {
+    border-radius: 999px;
+    border: 1px solid #e2e6f0;
+    background: #fff;
+    color: #4b5563;
+    padding: 0.4rem 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.filter-chip-group .btn-filter-chip.active,
+.filter-chip-group .btn-filter-chip:focus,
+.filter-chip-group .btn-filter-chip:hover {
+    background: #2563eb;
+    color: #fff;
+    border-color: #1d4ed8;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.18);
+}
+
+.card {
+    border-radius: 0.75rem;
+}
+
 .avatar {
     display: inline-flex;
     align-items: center;

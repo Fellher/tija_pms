@@ -110,7 +110,7 @@ $getString .= "&client_id={$clientID}";?>
          <nav aria-label="breadcrumb" class="mb-2">
             <ol class="breadcrumb mb-0">
                <li class="breadcrumb-item"><a href="<?= "{$base}html/?s={$s}&ss={$ss}&p=home" ?>">Home</a></li>
-               <li class="breadcrumb-item"><a href="<?= "{$base}html/?s={$s}&ss={$ss}&p=clients" ?>">Clients</a></li>
+               <li class="breadcrumb-item"><a href="<?= "{$base}html/?s={$s}&ss={$ss}&p=home" ?>">Clients</a></li>
                <li class="breadcrumb-item active" aria-current="page"><?= htmlspecialchars($clientDetails->clientName) ?></li>
             </ol>
          </nav>

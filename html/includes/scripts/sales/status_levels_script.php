@@ -127,46 +127,57 @@
       const statusButtons = document.querySelectorAll('input[name="saleStatus"]');
       const statusForm = document.getElementById('statusSubmit');
 
-      statusButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
-            // get all data
-               let data = button.dataset;
-               console.log(data);
-               console.log(`status level close level = ${data.closelevel}`);
-
-               // Check if this is a closed status level
-               const isCloseLevel = data.closelevel == 'Y' || data.closelevel === '1';
-               const statusLevel = data.statuslevel ? data.statuslevel.toLowerCase() : '';
-               const isClosedStatus = isCloseLevel || statusLevel.includes('closed') || statusLevel.includes('close');
-
-               if(isClosedStatus && !button.closest('.closeInput')) {
-                  // Prevent default submission
-                  e.preventDefault();
-                  e.stopPropagation();
-
-                  // Show modal to select won/lost
-                  const modal = document.getElementById('closeStatusModal');
-                  if(modal) {
-                     // Set the status level ID in hidden input
-                     const modalStatusLevelInput = document.getElementById('modalSaleStatusLevelID');
-                     if(modalStatusLevelInput) {
-                        modalStatusLevelInput.value = button.value;
-                     }
-
-                     // Also update the main form's status level ID
-                     document.getElementById('saleStatusLevelID').value = button.value;
-
-                     // Show modal using Bootstrap
-                     const bsModal = new bootstrap.Modal(modal);
-                     bsModal.show();
-                  }
-               } else if(data.closelevel == 'N' || data.closelevel == '') {
-                  document.getElementById('saleStatusLevelID').value = button.value;
-                  console.log(`status level ID = ${data.statusLevelId}`);
-                  console.log(data.closelevel);
-                  statusForm.submit();
-               }
+      async function confirmStatusChange(label) {
+         if (window.Swal && typeof Swal.fire === 'function') {
+            const result = await Swal.fire({
+               title: 'Change status?',
+               text: `Move this sales case to "${label}"?`,
+               icon: 'question',
+               showCancelButton: true,
+               confirmButtonColor: '#0d6efd',
+               cancelButtonColor: '#6c757d',
+               confirmButtonText: 'Yes, change',
+               cancelButtonText: 'No, keep current'
             });
+            return result.isConfirmed;
+         }
+         return window.confirm(`Move this sales case to "${label}"?`);
+      }
+
+      statusButtons.forEach(button => {
+         button.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const data = button.dataset;
+            const statusLabel = data.statuslevel || 'this status';
+
+            const isCloseLevel = data.closelevel == 'Y' || data.closelevel === '1';
+            const statusLevel = data.statuslevel ? data.statuslevel.toLowerCase() : '';
+            const isClosedStatus = isCloseLevel || statusLevel.includes('closed') || statusLevel.includes('close');
+
+            const confirmed = await confirmStatusChange(statusLabel);
+            if (!confirmed) return;
+
+            // Closed status path -> open close-status modal
+            if (isClosedStatus && !button.closest('.closeInput')) {
+               const modal = document.getElementById('closeStatusModal');
+               if (modal) {
+                  const modalStatusLevelInput = document.getElementById('modalSaleStatusLevelID');
+                  if (modalStatusLevelInput) {
+                     modalStatusLevelInput.value = button.value;
+                  }
+                  document.getElementById('saleStatusLevelID').value = button.value;
+                  const bsModal = new bootstrap.Modal(modal);
+                  bsModal.show();
+               }
+               return;
+            }
+
+            // Regular status path -> submit immediately
+            document.getElementById('saleStatusLevelID').value = button.value;
+            statusForm.submit();
+         });
       });
    });
 </script>

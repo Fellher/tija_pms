@@ -95,38 +95,52 @@ $pageTitle = "Operational Task Templates";
                 </div>
             </div>
         <?php else: ?>
-            <?php foreach ($templates as $template): ?>
+            <?php foreach ($templates as $template):
+                // Helper to safely read either object or array
+                $getVal = function($item, $field, $default = '') {
+                    if (is_object($item) && isset($item->$field)) return $item->$field;
+                    if (is_array($item) && isset($item[$field])) return $item[$field];
+                    return $default;
+                };
+                $templateName = htmlspecialchars($getVal($template, 'templateName', 'Unknown'));
+                $templateCode = htmlspecialchars($getVal($template, 'templateCode', ''));
+                $functionalArea = htmlspecialchars($getVal($template, 'functionalArea', 'N/A'));
+                $templateDesc = htmlspecialchars(substr($getVal($template, 'templateDescription', ''), 0, 150));
+                $freq = $getVal($template, 'frequencyType', 'custom');
+                $estimatedDuration = $getVal($template, 'estimatedDuration', '');
+                $processingMode = $getVal($template, 'processingMode', 'cron');
+                $templateID = $getVal($template, 'templateID', '');
+            ?>
                 <div class="col-xl-4 col-md-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div>
-                                    <h5 class="card-title mb-1"><?php echo htmlspecialchars($template['templateName'] ?? 'Unknown'); ?></h5>
-                                    <span class="badge bg-primary"><?php echo htmlspecialchars($template['templateCode'] ?? ''); ?></span>
+                                    <h5 class="card-title mb-1"><?php echo $templateName; ?></h5>
+                                    <span class="badge bg-primary"><?php echo $templateCode; ?></span>
                                 </div>
-                                <span class="badge bg-info"><?php echo htmlspecialchars($template['functionalArea'] ?? 'N/A'); ?></span>
+                                <span class="badge bg-info"><?php echo $functionalArea; ?></span>
                             </div>
                             <p class="card-text text-muted small">
-                                <?php echo htmlspecialchars(substr($template['templateDescription'] ?? '', 0, 150)); ?>...
+                                <?php echo $templateDesc; ?>...
                             </p>
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between mb-2">
                                     <small class="text-muted">Frequency:</small>
                                     <span class="badge bg-secondary">
                                         <?php
-                                            $freq = $template['frequencyType'] ?? 'custom';
                                             echo ucfirst($freq);
                                         ?>
                                     </span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <small class="text-muted">Estimated Duration:</small>
-                                    <strong><?php echo !empty($template['estimatedDuration']) ? number_format($template['estimatedDuration'], 2) . ' hrs' : 'N/A'; ?></strong>
+                                    <strong><?php echo !empty($estimatedDuration) ? number_format($estimatedDuration, 2) . ' hrs' : 'N/A'; ?></strong>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <small class="text-muted">Processing Mode:</small>
                                     <span class="badge bg-<?php
-                                        $mode = $template['processingMode'] ?? 'cron';
+                                        $mode = $processingMode;
                                         echo $mode === 'cron' ? 'success' : ($mode === 'manual' ? 'warning' : 'info');
                                     ?>">
                                         <?php echo ucfirst($mode); ?>
@@ -135,7 +149,7 @@ $pageTitle = "Operational Task Templates";
                             </div>
                         </div>
                         <div class="card-footer bg-transparent">
-                            <a href="?s=user&ss=operational&p=templates&action=view&id=<?php echo $template['templateID']; ?>"
+                            <a href="?s=user&ss=operational&p=templates&action=view&id=<?php echo htmlspecialchars($templateID); ?>"
                                class="btn btn-sm btn-primary w-100">
                                 <i class="ri-eye-line me-1"></i>View Details
                             </a>

@@ -120,6 +120,7 @@
                 <ul class="slide-menu child1">
                     <li class="slide side-menu__label1"><a href="javascript:void(0)">Sales</a></li>
                     <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=home"?>" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Overview</a></li>
+                    <li  class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=prospects"?>" class="side-menu__item"><i class="ri-dashboard-line me-2"></i>Prospecting</a></li>
                     <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=proposals"?>" class="side-menu__item"><i class="ri-file-paper-line me-2"></i>Proposals</a></li>
                     <li class="slide"><a href="<?php echo "{$base}html/?s=user&ss=sales&p=sales_analytics_dashboard"?>" class="side-menu__item"><i class="ri-bar-chart-line me-2"></i>Sales dashboard</a></li>
                     <?php

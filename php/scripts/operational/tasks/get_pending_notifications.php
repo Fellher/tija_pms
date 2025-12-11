@@ -12,8 +12,10 @@
 // Define base path before including config
 $base = '../../../../';
 
-require_once __DIR__ . '/../../../includes.php';
-require_once __DIR__ . '/../../../classes/operationaltaskscheduler.php';
+session_start();
+$base = '../../../';
+set_include_path($base);
+require_once 'php/includes.php';
 
 header('Content-Type: application/json');
 

@@ -10,9 +10,20 @@
 // Get proposal status stages
 $statusStages = Proposal::proposal_status_stages(array('isActive' => 'Y'), false, $DBConn);
 
-// Get current proposal stage
-$currentStage = isset($proposalDetails->statusStage) ? $proposalDetails->statusStage : 'draft';
+// Determine current stage using proposalStatusID if available
+$currentStatusID = isset($proposalDetails->proposalStatusID) ? $proposalDetails->proposalStatusID : null;
+$currentStage    = isset($proposalDetails->statusStage) ? $proposalDetails->statusStage : 'draft';
 $currentStageOrder = isset($proposalDetails->statusStageOrder) ? $proposalDetails->statusStageOrder : 1;
+
+if ($statusStages && $currentStatusID) {
+   foreach ($statusStages as $stage) {
+      if (isset($stage->stageID) && intval($stage->stageID) === intval($currentStatusID)) {
+         $currentStage = $stage->stageCode ?? $currentStage;
+         $currentStageOrder = $stage->stageOrder ?? $currentStageOrder;
+         break;
+      }
+   }
+}
 
 // Calculate completion percentages
 $completionData = Proposal::calculate_proposal_completion($proposalID, $DBConn);
@@ -43,12 +54,15 @@ $mandatoryCompletion = $completionData['mandatory'] ?? 0;
    </div>
    <div class="card-body">
       <!-- Status Stages Progress Bar -->
-      <?php if($statusStages && count($statusStages) > 0): ?>
+      <?php if($statusStages && count($statusStages) > 0):
+
+         ?>
          <div class="status-stages-tracker">
             <div class="d-flex align-items-center justify-content-between mb-3">
                <?php foreach($statusStages as $stage): ?>
                   <?php
-                  $isActive = ($stage->stageCode === $currentStage);
+                  $matchesID = $currentStatusID && isset($stage->stageID) && intval($stage->stageID) === intval($currentStatusID);
+                  $isActive = $matchesID || ($stage->stageCode == $currentStage);
                   $isCompleted = ($stage->stageOrder < $currentStageOrder);
                   $isPending = ($stage->stageOrder > $currentStageOrder);
                   ?>
@@ -139,6 +153,105 @@ $mandatoryCompletion = $completionData['mandatory'] ?? 0;
       </div>
    </div>
 </div>
+
+<!-- Change Proposal Stage Modal -->
+<div class="modal fade" id="changeProposalStageModal" tabindex="-1" aria-labelledby="changeProposalStageModalLabel" aria-hidden="true">
+   <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+         <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="changeProposalStageModalLabel">
+               <i class="ri-arrow-right-line me-2"></i>Change Proposal Status
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <form id="changeProposalStageForm">
+            <div class="modal-body">
+               <div class="mb-3">
+                  <label class="form-label">Select Status Stage</label>
+                  <select class="form-select" name="proposalStatusID" id="proposalStatusSelect" required>
+                     <option value="">Choose status...</option>
+                     <?php if($statusStages): ?>
+                        <?php foreach($statusStages as $stage): ?>
+                           <?php
+                              $selected = ($currentStatusID && isset($stage->stageID) && intval($stage->stageID) === intval($currentStatusID))
+                                          ? 'selected'
+                                          : (($stage->stageCode ?? '') === $currentStage ? 'selected' : '');
+                           ?>
+                           <option value="<?= $stage->stageID ?>" <?= $selected ?>>
+                              <?= htmlspecialchars($stage->stageName) ?>
+                           </option>
+                        <?php endforeach; ?>
+                     <?php endif; ?>
+                  </select>
+               </div>
+               <input type="hidden" name="proposalID" value="<?= $proposalDetails->proposalID ?? '' ?>">
+               <input type="hidden" name="entityID" value="<?= $proposalDetails->entityID ?? ($entityID ?? '') ?>">
+               <input type="hidden" name="orgDataID" value="<?= $proposalDetails->orgDataID ?? ($orgDataID ?? '') ?>">
+               <input type="hidden" name="employeeID" value="<?= $proposalDetails->employeeID ?? ($userDetails->ID ?? '') ?>">
+               <input type="hidden" name="ajax" value="1">
+            </div>
+            <div class="modal-footer">
+               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+               <button type="submit" class="btn btn-primary" id="changeStageSubmit">
+                  <i class="ri-check-line me-1"></i>Update Status
+               </button>
+            </div>
+         </form>
+      </div>
+   </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+   const form = document.getElementById('changeProposalStageForm');
+   const submitBtn = document.getElementById('changeStageSubmit');
+   const modalEl = document.getElementById('changeProposalStageModal');
+
+   function notifyError(message) {
+      if (window.Swal && typeof Swal.fire === 'function') {
+         Swal.fire({
+            icon: 'error',
+            title: 'Update failed',
+            text: message || 'Something went wrong while updating the status'
+         });
+      } else {
+         alert(message || 'Something went wrong while updating the status');
+      }
+   }
+
+   form?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!form.checkValidity()) return;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+
+      const fd = new FormData(form);
+
+      fetch('<?= $base ?>php/scripts/sales/manage_proposal.php', {
+         method: 'POST',
+         body: fd
+      })
+      .then(res => res.json())
+      .then(res => {
+         if (res.success) {
+            if (window.bootstrap) {
+               const bsModal = bootstrap.Modal.getInstance(modalEl);
+               bsModal && bsModal.hide();
+            }
+            setTimeout(() => location.reload(), 300);
+         } else {
+            notifyError(res.message || 'Failed to update proposal status');
+         }
+      })
+      .catch(() => notifyError('Network error updating proposal status'))
+      .finally(() => {
+         submitBtn.disabled = false;
+         submitBtn.innerHTML = '<i class="ri-check-line me-1"></i>Update Status';
+      });
+   });
+});
+</script>
 
 <style>
 .status-stages-tracker {

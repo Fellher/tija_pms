@@ -187,5 +187,19 @@ class Admin {
         return ($single === true) ? ((is_array($rows) && count($rows) === 1) ? $rows[0] : false) : ((is_array($rows) && count($rows) > 0) ? $rows : false);
     }
 
+    /**
+     * Get salutations from database
+     *
+     * @param array $whereArr Where clause conditions
+     * @param bool $single Return single record or array
+     * @param object $DBConn Database connection
+     * @return mixed Single object or array of objects, or false
+     */
+    public static function salutations($whereArr, $single, $DBConn) {
+        $cols = array('salutationID', 'DateAdded', 'salutation','salutationDescription', 'is_active', 'created_at', 'LastUpdate', 'Lapsed', 'Suspended');
+        $rows = $DBConn->retrieve_db_table_rows('tija_salutation', $cols, $whereArr);
+        return ($single === true) ? ((is_array($rows) && count($rows) === 1) ? $rows[0] : false) : ((is_array($rows) && count($rows) > 0) ? $rows : false);
+    }
+
 
 }?>

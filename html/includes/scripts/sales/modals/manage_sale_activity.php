@@ -216,13 +216,9 @@
             <!-- Duration-based Fields -->
             <div id="durationFields" style="display: none;">
                <div class="row g-3">
-                  <div class="col-md-6">
+                  <div class="col-md-12">
                      <label for="activityDurationEndDate" class="form-label">End Date</label>
                      <input type="text" id="activityDurationEndDate" name="activityDurationEndDate" class="form-control" placeholder="Select end date">
-                  </div>
-                  <div class="col-md-6">
-                     <label for="activityDurationEndTime" class="form-label">End Time</label>
-                     <input type="text" id="activityDurationEndTime" name="activityDurationEndTime" class="form-control" placeholder="Select end time">
                   </div>
                </div>
             </div>

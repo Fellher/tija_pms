@@ -21,8 +21,94 @@ require_once 'php/classes/goalhierarchy.php';
 
 $goalUUID = isset($_GET['goalUUID']) ? Utility::clean_string($_GET['goalUUID']) : '';
 
+// If no goalUUID was provided, show a list of the user's goals to pick from
 if (empty($goalUUID)) {
-    Alert::error("Goal UUID is required", true);
+    $userGoals = Goal::getGoalsByOwner($userDetails->ID, 'User', array(), $DBConn);
+    ?>
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12 d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">My Goals</h4>
+                    <p class="text-muted mb-0">Select a goal to view its details</p>
+                </div>
+                <a href="<?= "{$base}html/?s=user&ss=goals&p=dashboard" ?>" class="btn btn-outline-secondary">
+                    <i class="bi bi-grid me-2"></i>Goals Dashboard
+                </a>
+            </div>
+        </div>
+
+        <?php if ($userGoals && count($userGoals) > 0): ?>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Goal</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>End Date</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($userGoals as $goalRow): ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo htmlspecialchars($goalRow->goalTitle); ?></strong>
+                                            <?php if ($goalRow->propriety === 'Critical'): ?>
+                                                <span class="badge bg-danger ms-2">Critical</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><span class="badge bg-info"><?php echo htmlspecialchars($goalRow->goalType); ?></span></td>
+                                        <td>
+                                            <span class="badge bg-<?php
+                                                echo $goalRow->status === 'Active' ? 'success' :
+                                                    ($goalRow->status === 'Completed' ? 'primary' : 'secondary');
+                                            ?>">
+                                                <?php echo htmlspecialchars($goalRow->status); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 14px;">
+                                                <div class="progress-bar" role="progressbar"
+                                                    style="width: <?php echo $goalRow->completionPercentage ?? 0; ?>%"
+                                                    aria-valuenow="<?php echo $goalRow->completionPercentage ?? 0; ?>"
+                                                    aria-valuemin="0" aria-valuemax="100">
+                                                    <?php echo number_format($goalRow->completionPercentage ?? 0, 1); ?>%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><?php echo date('M d, Y', strtotime($goalRow->endDate)); ?></td>
+                                        <td class="text-end">
+                                            <a href="<?= "{$base}html/?s=user&ss=goals&p=goal_detail&goalUUID=" . $goalRow->goalUUID ?>"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                    <h5 class="text-muted">No goals found</h5>
+                    <p class="text-muted">Create a goal from the dashboard to get started.</p>
+                    <a href="<?= "{$base}html/?s=user&ss=goals&p=dashboard" ?>" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-2"></i>Create Goal
+                    </a>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php
     return;
 }
 

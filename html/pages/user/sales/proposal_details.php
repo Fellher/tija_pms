@@ -30,7 +30,6 @@ $checkListStatus = Proposal::proposal_checklist_status([], false, $DBConn);
 //
 // var_dump($proposalDetails);
 ?>
-
 <div class="d-md-flex d-block align-items-center justify-content-between my-4 page-header-breadcrumb border-bottom">
    <h1 class="page-title fw-medium fs-24 mb-0"><?= "{$proposalDetails->proposalTitle} " ?> </h1>
    <div class="ms-md-1 ms-0">

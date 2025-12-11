@@ -80,7 +80,7 @@ $priorityColors = [
             <small class="text-muted">Drag and drop tasks between columns</small>
         </div>
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-primary btn-sm" onclick="openAddTaskModal()">
+            <button type="button" class="btn btn-primary btn-sm" onclick="openAddTaskModal()" data-phase-id="">
                 <i class="fas fa-plus me-1"></i>Add Task
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleFilters()">
@@ -176,6 +176,12 @@ $priorityColors = [
                                 <i class="fas fa-circle text-secondary me-2"></i>To Do
                             </h6>
                             <span class="badge bg-secondary"><?= count($tasksByStatus['todo']) ?></span>
+                            <button type="button"
+                                    class="btn btn-xs btn-outline-primary"
+                                    title="Add task to To Do"
+                                    onclick="openAddTaskModal('')">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="kanban-column-body" id="kanban-todo" data-status="todo">
@@ -202,6 +208,12 @@ $priorityColors = [
                                 <i class="fas fa-circle text-primary me-2"></i>In Progress
                             </h6>
                             <span class="badge bg-primary"><?= count($tasksByStatus['in_progress']) ?></span>
+                            <button type="button"
+                                    class="btn btn-xs btn-outline-primary"
+                                    title="Add task to In Progress"
+                                    onclick="openAddTaskModal('')">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="kanban-column-body" id="kanban-in_progress" data-status="in_progress">
@@ -228,6 +240,12 @@ $priorityColors = [
                                 <i class="fas fa-circle text-warning me-2"></i>In Review
                             </h6>
                             <span class="badge bg-warning"><?= count($tasksByStatus['review']) ?></span>
+                            <button type="button"
+                                    class="btn btn-xs btn-outline-primary"
+                                    title="Add task to Review"
+                                    onclick="openAddTaskModal('')">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="kanban-column-body" id="kanban-review" data-status="review">
@@ -254,6 +272,12 @@ $priorityColors = [
                                 <i class="fas fa-circle text-success me-2"></i>Done
                             </h6>
                             <span class="badge bg-success"><?= count($tasksByStatus['done']) ?></span>
+                            <button type="button"
+                                    class="btn btn-xs btn-outline-primary"
+                                    title="Add task to Done"
+                                    onclick="openAddTaskModal('')">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="kanban-column-body" id="kanban-done" data-status="done">
@@ -272,6 +296,80 @@ $priorityColors = [
             </div>
         </div>
     </div>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="addTaskModalLabel">
+          <i class="fas fa-plus-circle me-2"></i>Add Task
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="kanbanAddTaskForm">
+        <div class="modal-body">
+          <input type="hidden" name="projectID" value="<?= $projectID ?? '' ?>">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Title *</label>
+              <input type="text" name="taskTitle" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Assignee</label>
+              <select name="assigneeID" class="form-select">
+                <option value="">Unassigned</option>
+                <?php if (!empty($projectTeamMembers ?? [])): ?>
+                  <?php foreach ($projectTeamMembers as $member): ?>
+                    <option value="<?= $member->employeeID ?? $member->ID ?>">
+                      <?= htmlspecialchars($member->employeeName ?? $member->userFullName ?? $member->name ?? 'Member') ?>
+                    </option>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Status</label>
+              <select name="taskStatus" class="form-select">
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">In Review</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Priority</label>
+              <select name="priority" class="form-select">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Start Date</label>
+              <input type="date" name="startDate" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Due Date</label>
+              <input type="date" name="dueDate" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea name="taskDescription" class="form-control" rows="3" placeholder="What needs to be done?"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveKanbanTaskBtn">
+            <i class="fas fa-save me-1"></i>Save Task
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -362,11 +460,99 @@ function updateTaskCardStatus(taskID, newStatus) {
     }
 }
 
-function openAddTaskModal() {
-    // Open task creation modal
-    const modal = new bootstrap.Modal(document.getElementById('addTaskModal'));
-    modal.show();
+function openAddTaskModal(phaseId = '') {
+    // Prefer the global manage_project_task modal to keep consistency
+    const modalEl = document.getElementById('manage_project_task');
+    if (!modalEl) {
+        console.warn('manage_project_task modal not found; falling back to local addTaskModal');
+        const fallback = document.getElementById('addTaskModal');
+        if (fallback && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(fallback).show();
+        }
+        return;
+    }
+
+    // Populate hidden fields on the modal form
+    const setVal = (selector, val) => {
+        const el = modalEl.querySelector(selector);
+        if (el) el.value = val || '';
+    };
+
+    setVal('.projectID', '<?= $projectID ?? '' ?>');
+    setVal('.clientID', '<?= $projectDetails->clientID ?? '' ?>');
+    setVal('.projectPhaseID', phaseId || '');
+    setVal('.projectTaskID', ''); // ensure new task
+
+    // Clear basic fields
+    setVal('.projectTaskName', '');
+    setVal('.taskDescription', '');
+    setVal('#taskStartDate', '');
+    setVal('#taskDeadline', '');
+    setVal('.hoursAllocated', '');
+    setVal('.taskWeighting', '');
+
+    // If phase dates are available on the trigger, use them
+    const trigger = event?.currentTarget;
+    if (trigger) {
+        const phaseStart = trigger.dataset.phaseStart || '';
+        const phaseEnd = trigger.dataset.phaseEnd || '';
+        setVal('#phaseStartDate', phaseStart);
+        setVal('#phaseEndDate', phaseEnd);
+    }
+
+    if (window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
 }
+
+// Handle Add Task submission (inline simple handler)
+document.addEventListener('DOMContentLoaded', function() {
+    const addTaskForm = document.getElementById('kanbanAddTaskForm');
+    const saveBtn = document.getElementById('saveKanbanTaskBtn');
+    if (addTaskForm && saveBtn) {
+        addTaskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!addTaskForm.checkValidity()) return;
+
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+            const fd = new FormData(addTaskForm);
+            fetch('<?= $base ?>php/scripts/projects/manage_task.php', {
+                method: 'POST',
+                body: fd
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    if (window.bootstrap) {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addTaskModal'));
+                        modal && modal.hide();
+                    }
+                    // Refresh the board to show the new task
+                    location.reload();
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast(res.message || 'Failed to add task', 'danger');
+                    } else {
+                        alert(res.message || 'Failed to add task');
+                    }
+                }
+            })
+            .catch(() => {
+                if (typeof showToast === 'function') {
+                    showToast('Network error adding task', 'danger');
+                } else {
+                    alert('Network error adding task');
+                }
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Task';
+            });
+        });
+    }
+});
 
 function toggleFilters() {
     const filters = document.getElementById('kanbanFilters');

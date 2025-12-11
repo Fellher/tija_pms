@@ -29,7 +29,15 @@ class GoalAutomation {
         );
 
         $where = array('userID' => $userID);
-        $settings = $DBConn->retrieve_db_table_rows('tija_goal_automation_settings', $cols, $where, false);
+        $settings = array();
+
+        try {
+            $settings = $DBConn->retrieve_db_table_rows('tija_goal_automation_settings', $cols, $where, false);
+        } catch (\Throwable $e) {
+            // Table may not exist yet; fall back to defaults without breaking the page
+            error_log("GoalAutomation::getSettings fallback to defaults: " . $e->getMessage());
+            $settings = array();
+        }
 
         // Organize by automation type
         $organized = array();
@@ -40,33 +48,7 @@ class GoalAutomation {
         }
 
         // Return defaults if no settings found
-        $defaults = array(
-            'score_calculation' => (object)array(
-                'executionMode' => 'automatic',
-                'isEnabled' => 'Y',
-                'notificationPreference' => 'both'
-            ),
-            'snapshot_generation' => (object)array(
-                'executionMode' => 'automatic',
-                'isEnabled' => 'Y',
-                'notificationPreference' => 'both'
-            ),
-            'evaluation_reminders' => (object)array(
-                'executionMode' => 'automatic',
-                'isEnabled' => 'Y',
-                'notificationPreference' => 'both'
-            ),
-            'deadline_alerts' => (object)array(
-                'executionMode' => 'automatic',
-                'isEnabled' => 'Y',
-                'notificationPreference' => 'both'
-            ),
-            'cascade_updates' => (object)array(
-                'executionMode' => 'automatic',
-                'isEnabled' => 'Y',
-                'notificationPreference' => 'both'
-            )
-        );
+        $defaults = self::defaultSettings();
 
         foreach ($defaults as $type => $default) {
             if (!isset($organized[$type])) {
@@ -91,33 +73,38 @@ class GoalAutomation {
             global $DBConn;
         }
 
-        // Check if setting exists
-        $existing = $DBConn->retrieve_db_table_rows(
-            'tija_goal_automation_settings',
-            array('settingID'),
-            array('userID' => $userID, 'automationType' => $automationType),
-            true
-        );
-
-        $settingData = array(
-            'userID' => $userID,
-            'automationType' => $automationType,
-            'executionMode' => $data['executionMode'] ?? 'automatic',
-            'scheduleFrequency' => $data['scheduleFrequency'] ?? null,
-            'scheduleTime' => $data['scheduleTime'] ?? null,
-            'isEnabled' => $data['isEnabled'] ?? 'Y',
-            'notificationPreference' => $data['notificationPreference'] ?? 'both',
-            'LastUpdatedByID' => $userID
-        );
-
-        if ($existing) {
-            return $DBConn->update_table(
+        try {
+            // Check if setting exists
+            $existing = $DBConn->retrieve_db_table_rows(
                 'tija_goal_automation_settings',
-                $settingData,
-                array('settingID' => $existing->settingID)
+                array('settingID'),
+                array('userID' => $userID, 'automationType' => $automationType),
+                true
             );
-        } else {
-            return $DBConn->insert_data('tija_goal_automation_settings', $settingData);
+
+            $settingData = array(
+                'userID' => $userID,
+                'automationType' => $automationType,
+                'executionMode' => $data['executionMode'] ?? 'automatic',
+                'scheduleFrequency' => $data['scheduleFrequency'] ?? null,
+                'scheduleTime' => $data['scheduleTime'] ?? null,
+                'isEnabled' => $data['isEnabled'] ?? 'Y',
+                'notificationPreference' => $data['notificationPreference'] ?? 'both',
+                'LastUpdatedByID' => $userID
+            );
+
+            if ($existing) {
+                return $DBConn->update_table(
+                    'tija_goal_automation_settings',
+                    $settingData,
+                    array('settingID' => $existing->settingID)
+                );
+            } else {
+                return $DBConn->insert_data('tija_goal_automation_settings', $settingData);
+            }
+        } catch (\Throwable $e) {
+            error_log("GoalAutomation::updateSetting failed: " . $e->getMessage());
+            return false;
         }
     }
 
@@ -215,6 +202,41 @@ class GoalAutomation {
         }
 
         return $result;
+    }
+
+    /**
+     * Default automation settings when none are stored or table is unavailable.
+     *
+     * @return array
+     */
+    private static function defaultSettings() {
+        return array(
+            'score_calculation' => (object)array(
+                'executionMode' => 'automatic',
+                'isEnabled' => 'Y',
+                'notificationPreference' => 'both'
+            ),
+            'snapshot_generation' => (object)array(
+                'executionMode' => 'automatic',
+                'isEnabled' => 'Y',
+                'notificationPreference' => 'both'
+            ),
+            'evaluation_reminders' => (object)array(
+                'executionMode' => 'automatic',
+                'isEnabled' => 'Y',
+                'notificationPreference' => 'both'
+            ),
+            'deadline_alerts' => (object)array(
+                'executionMode' => 'automatic',
+                'isEnabled' => 'Y',
+                'notificationPreference' => 'both'
+            ),
+            'cascade_updates' => (object)array(
+                'executionMode' => 'automatic',
+                'isEnabled' => 'Y',
+                'notificationPreference' => 'both'
+            )
+        );
     }
 }
 

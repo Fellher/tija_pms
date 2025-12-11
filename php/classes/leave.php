@@ -48,7 +48,6 @@ class Leave {
             ";
             $DBConn->query($createSql);
         } catch (Exception $e) {
-            error_log('[Leave::ensure_leave_comments_table] ' . $e->getMessage());
         }
     }
 
@@ -92,7 +91,6 @@ class Leave {
                     try {
                         $DBConn->query("ALTER TABLE tija_leave_approval_step_approvers MODIFY COLUMN stepApproverID INT(11) NOT NULL AUTO_INCREMENT");
                     } catch (Exception $e) {
-                        error_log('[Leave::ensure_workflow_schema] Failed to set auto increment: ' . $e->getMessage());
                     }
                 }
 
@@ -104,7 +102,6 @@ class Leave {
                         }
                         $DBConn->query("ALTER TABLE tija_leave_approval_step_approvers ADD PRIMARY KEY (stepApproverID)");
                     } catch (Exception $e) {
-                        error_log('[Leave::ensure_workflow_schema] Failed to set primary key: ' . $e->getMessage());
                     }
                 }
 
@@ -117,17 +114,14 @@ class Leave {
                 $DBConn->query("ALTER TABLE tija_leave_approval_step_approvers ADD COLUMN stepApproverID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST");
                 self::$workflowHasStepApproverId = true;
             } catch (Exception $primaryError) {
-                error_log('[Leave::ensure_workflow_schema] Primary add failed: ' . $primaryError->getMessage());
                 try {
                     $DBConn->query("ALTER TABLE tija_leave_approval_step_approvers ADD COLUMN stepApproverID INT(11) NOT NULL FIRST");
                     self::$workflowHasStepApproverId = true;
                 } catch (Exception $secondaryError) {
-                    error_log('[Leave::ensure_workflow_schema] Column add fallback failed: ' . $secondaryError->getMessage());
                     self::$workflowHasStepApproverId = false;
                 }
             }
         } catch (Exception $outer) {
-            error_log('[Leave::ensure_workflow_schema] ' . $outer->getMessage());
             self::$workflowHasStepApproverId = false;
         }
     }
@@ -185,7 +179,6 @@ class Leave {
             $DBConn->execute();
             self::$manualBalancesTableExists = true;
         } catch (Exception $e) {
-            error_log('[Leave::setup_manual_balance_table] ' . $e->getMessage());
             self::$manualBalancesTableExists = false;
         }
 
@@ -340,7 +333,6 @@ class Leave {
             }
          }
 
-         // var_dump($where);
          $sql = "SELECT e.*,
          l.leaveTypeName, l.leaveTypeDescription, l.leaveSegment,
          s.entityName
@@ -635,7 +627,6 @@ class Leave {
             }
          }
 
-         // var_dump($where);
        $sql = "SELECT e.leaveApplicationID, e.DateAdded, e.leaveTypeID, e.leavePeriodID, e.startDate, e.endDate, e.leaveStatusID, e.employeeID, e.leaveFiles, e.leaveComments, e.noOfDays, e.entityID, e.orgDataID, e.LastUpdate, e.LastUpdateByID, e.Lapsed, e.Suspended, e.emergencyContact, e.handoverNotes, e.handoverRequired, e.handoverStatus, e.handoverCompletedDate, e.createdBy, e.createdDate, e.modifiedBy, e.modifiedDate, e.halfDayLeave, e.halfDayPeriod, e.dateApplied, e.appliedByID, le.leaveEntitlementID, le.entitlement, le.entityID, le.orgDataID,
          l.leaveTypeName, l.leaveTypeDescription, s.entityName,
          st.leaveStatusName, st.leaveStatusDescription, p.leavePeriodName, p.leavePeriodStartDate, p.leavePeriodEndDate,
@@ -963,7 +954,6 @@ class Leave {
         );
 
         $rows = $DBConn->fetch_all_rows($sql, $params);
-        // var_dump($rows);
 
         return ($rows && count($rows) > 0) ? ($rows[0]->totalDays ?? 0) : 0;
     }
@@ -2690,15 +2680,11 @@ class Leave {
      * @return mixed Active approval policy or false if none found
      */
     public static function get_active_approval_workflow($entityID, $DBConn) {
-        error_log("Leave::get_active_approval_workflow - Called with entityID: {$entityID}");
-
         if (empty($entityID)) {
-            error_log("Leave::get_active_approval_workflow - ERROR: Empty entityID provided");
             return false;
         }
 
         // First try to get default active workflow
-        error_log("Leave::get_active_approval_workflow - Checking for default active workflow...");
         $defaultPolicy = self::leave_approval_policies(
             array(
                 'entityID' => $entityID,
@@ -2713,14 +2699,10 @@ class Leave {
         if ($defaultPolicy) {
             $policyID = is_object($defaultPolicy) ? $defaultPolicy->policyID : (is_array($defaultPolicy) ? $defaultPolicy['policyID'] : null);
             $policyName = is_object($defaultPolicy) ? $defaultPolicy->policyName : (is_array($defaultPolicy) ? $defaultPolicy['policyName'] : 'N/A');
-            error_log("Leave::get_active_approval_workflow - Found default workflow: Policy ID {$policyID}, Name: {$policyName}");
             return $defaultPolicy;
-        } else {
-            error_log("Leave::get_active_approval_workflow - No default workflow found");
         }
 
         // If no default, get any active workflow
-        error_log("Leave::get_active_approval_workflow - Checking for any active workflow...");
         $activePolicies = self::leave_approval_policies(
             array(
                 'entityID' => $entityID,
@@ -2734,26 +2716,7 @@ class Leave {
         if ($activePolicies && count($activePolicies) > 0) {
             $policyID = is_object($activePolicies[0]) ? $activePolicies[0]->policyID : (is_array($activePolicies[0]) ? $activePolicies[0]['policyID'] : null);
             $policyName = is_object($activePolicies[0]) ? $activePolicies[0]->policyName : (is_array($activePolicies[0]) ? $activePolicies[0]['policyName'] : 'N/A');
-            error_log("Leave::get_active_approval_workflow - Found active workflow: Policy ID {$policyID}, Name: {$policyName} (Total: " . count($activePolicies) . ")");
             return $activePolicies[0];
-        } else {
-            error_log("Leave::get_active_approval_workflow - WARNING: No active workflow found for entity {$entityID}");
-
-            // Check if any policies exist at all for this entity
-            $allPolicies = self::leave_approval_policies(
-                array('entityID' => $entityID, 'Lapsed' => 'N'),
-                false,
-                $DBConn
-            );
-            if ($allPolicies && count($allPolicies) > 0) {
-                error_log("Leave::get_active_approval_workflow - Found " . count($allPolicies) . " policy/policies but none are active");
-                foreach ($allPolicies as $idx => $policy) {
-                    $pol = is_object($policy) ? (array)$policy : $policy;
-                    error_log("  Policy #{$idx}: ID=" . ($pol['policyID'] ?? 'N/A') . ", Name=" . ($pol['policyName'] ?? 'N/A') . ", isActive=" . ($pol['isActive'] ?? 'N/A') . ", Lapsed=" . ($pol['Lapsed'] ?? 'N/A'));
-                }
-            } else {
-                error_log("Leave::get_active_approval_workflow - No policies found at all for entity {$entityID}");
-            }
         }
 
         return false;
@@ -2859,10 +2822,7 @@ class Leave {
      * @return array Array of approvers with step information
      */
     public static function get_workflow_approvers($policyID, $DBConn) {
-        error_log("Leave::get_workflow_approvers - Called with policyID: {$policyID}");
-
         if (empty($policyID)) {
-            error_log("Leave::get_workflow_approvers - ERROR: Empty policyID provided");
             return array();
         }
 
@@ -2875,8 +2835,6 @@ class Leave {
                 $columnNames[] = $col['Field'] ?? $col['field'] ?? '';
             }
         }
-        error_log("Leave::get_workflow_approvers - Table columns: " . implode(', ', $columnNames));
-
         $hasStepApproverID = in_array('stepApproverID', $columnNames);
         $hasApproverID = in_array('approverID', $columnNames);
         $hasApproverType = in_array('approverType', $columnNames);
@@ -2930,15 +2888,9 @@ class Leave {
                 WHERE " . implode(' AND ', $whereConditions) . "
                 ORDER BY s.stepOrder, sa.notificationOrder";
 
-        error_log("Leave::get_workflow_approvers - SQL: {$sql}");
-        error_log("Leave::get_workflow_approvers - Params: policyID = {$policyID}");
-
         $records = $DBConn->fetch_all_rows($sql, $params);
 
         if (!$records) {
-            error_log("Leave::get_workflow_approvers - WARNING: No approvers found for policyID {$policyID}");
-            error_log("Leave::get_workflow_approvers - Attempting to resolve dynamic approvers from workflow steps...");
-
             // If no approvers found, try to get steps and resolve dynamic approvers
             $steps = self::leave_approval_steps(
                 array('policyID' => $policyID, 'Suspended' => 'N'),
@@ -2946,21 +2898,11 @@ class Leave {
                 $DBConn
             );
 
-            if ($steps && count($steps) > 0) {
-                error_log("Leave::get_workflow_approvers - Found " . count($steps) . " step(s) to resolve");
-                // Return empty array - dynamic approvers will be resolved at submission time
-                // This is expected for workflows with dynamic approver types
-                return array();
-            }
-
             return array();
         }
 
-        error_log("Leave::get_workflow_approvers - Found " . count($records) . " approver(s)");
-
         $mappedRecords = array_map(function($record) {
             $mapped = is_object($record) ? (array)$record : $record;
-            error_log("Leave::get_workflow_approvers - Approver: " . json_encode($mapped));
             return $mapped;
         }, $records);
 
@@ -2976,8 +2918,6 @@ class Leave {
      * @return array Array of resolved approvers with step information
      */
     public static function resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn) {
-        error_log("Leave::resolve_dynamic_workflow_approvers - Called with policyID: {$policyID}, employeeID: {$employeeID}");
-
         if (empty($policyID) || empty($employeeID)) {
             return array();
         }
@@ -2990,14 +2930,12 @@ class Leave {
         );
 
         if (!$steps || count($steps) === 0) {
-            error_log("Leave::resolve_dynamic_workflow_approvers - No steps found for policy {$policyID}");
             return array();
         }
 
         // Get employee details
         $employee = Employee::employees(array('ID' => $employeeID), true, $DBConn);
         if (!$employee) {
-            error_log("Leave::resolve_dynamic_workflow_approvers - Employee {$employeeID} not found");
             return array();
         }
 
@@ -3008,8 +2946,6 @@ class Leave {
             $stepType = $stepObj->stepType ?? '';
             $stepOrder = isset($stepObj->stepOrder) ? (int)$stepObj->stepOrder : 0;
             $stepID = $stepObj->stepID ?? null;
-
-            error_log("Leave::resolve_dynamic_workflow_approvers - Resolving step {$stepID} ({$stepType})");
 
             $approverUserID = null;
             $approverName = '';
@@ -3022,7 +2958,6 @@ class Leave {
                         $supervisor = Employee::employees(array('ID' => $approverUserID), true, $DBConn);
                         $approverName = $supervisor ? ($supervisor->employeeName) : 'Supervisor';
                         $approverEmail = $supervisor && isset($supervisor->Email) ? $supervisor->Email : '';
-                        error_log("Leave::resolve_dynamic_workflow_approvers - Resolved supervisor: {$approverUserID}");
                     }
                     break;
 
@@ -3032,7 +2967,6 @@ class Leave {
                         $approverUserID = (int)$deptHead->ID;
                         $approverName = is_object($deptHead) ? ($deptHead->employeeName) : 'Department Head';
                         $approverEmail = is_object($deptHead) && isset($deptHead->Email) ? $deptHead->Email : '';
-                        error_log("Leave::resolve_dynamic_workflow_approvers - Resolved department head: {$approverUserID}");
                     }
                     break;
 
@@ -3044,7 +2978,6 @@ class Leave {
                         $supervisor = Employee::employees(array('ID' => $approverUserID), true, $DBConn);
                         $approverName = $supervisor ? ($supervisor->employeeName) : 'Project Manager';
                         $approverEmail = $supervisor && isset($supervisor->Email) ? $supervisor->Email : '';
-                        error_log("Leave::resolve_dynamic_workflow_approvers - Resolved project manager (using supervisor): {$approverUserID}");
                     }
                     break;
 
@@ -3054,7 +2987,6 @@ class Leave {
                         $approverUserID = (int)$hrManager->ID;
                         $approverName = is_object($hrManager) ? ($hrManager->FirstName . ' ' . $hrManager->Surname) : 'HR Manager';
                         $approverEmail = is_object($hrManager) && isset($hrManager->Email) ? $hrManager->Email : '';
-                        error_log("Leave::resolve_dynamic_workflow_approvers - Resolved HR manager: {$approverUserID}");
                     }
                     break;
             }
@@ -3062,7 +2994,6 @@ class Leave {
             if ($approverUserID) {
                 // Ensure stepID and stepOrder are both set
                 if (!$stepID || !$stepOrder) {
-                    error_log("Leave::resolve_dynamic_workflow_approvers - ERROR: Missing stepID or stepOrder for approver. stepID: " . ($stepID ?? 'NULL') . ", stepOrder: " . ($stepOrder ?? 'NULL') . ", stepType: {$stepType}");
                     continue; // Skip this approver if step info is missing
                 }
 
@@ -3077,14 +3008,8 @@ class Leave {
                     'isBackup' => 'N',
                     'notificationOrder' => 1
                 );
-
-                error_log("Leave::resolve_dynamic_workflow_approvers - Added approver: UserID: {$approverUserID}, StepID: {$stepID}, StepOrder: {$stepOrder}, StepType: {$stepType}");
-            } else {
-                error_log("Leave::resolve_dynamic_workflow_approvers - WARNING: Could not resolve approver for step {$stepID} ({$stepType})");
             }
         }
-
-        error_log("Leave::resolve_dynamic_workflow_approvers - Resolved " . count($resolvedApprovers) . " approver(s)");
 
         return $resolvedApprovers;
     }
@@ -3454,7 +3379,6 @@ class Leave {
         // If no saved approvers and we have employee ID, resolve dynamic approvers
         if (empty($approvers) && $employeeID) {
             $approvers = self::resolve_dynamic_workflow_approvers($policyID, $employeeID, $DBConn);
-            error_log("check_workflow_approval_status: Resolved dynamic approvers for employee {$employeeID}: " . count($approvers) . " approver(s)");
         }
 
         // Get all approval actions for this instance
@@ -3500,7 +3424,6 @@ class Leave {
             // Get approvers for this step
             $stepApprovers = array();
             foreach ($approvers as $approver) {
-
                 if (isset($approver['stepID']) && (int)$approver['stepID'] === $stepID) {
                     $approverUserID = isset($approver['approverUserID']) ? (int)$approver['approverUserID'] : null;
                     $isBackup = isset($approver['isBackup']) && strtoupper($approver['isBackup']) === 'Y';

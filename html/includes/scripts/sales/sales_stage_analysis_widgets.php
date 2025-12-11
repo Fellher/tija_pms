@@ -56,14 +56,18 @@ if ($stageData['opportunities']['count'] > 0) {
 <!-- Sales Stage Analysis Widgets Container -->
 <div class="container-fluid">
     <div class="row">
-        
+
         <!-- Pipeline Overview Widget -->
         <div class="col-xl-8 col-lg-7 col-md-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-bar-chart-line me-2"></i>Sales Pipeline Overview
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Value and volume by stage, with a doughnut showing distribution.">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Shows total pipeline, total cases, and stage mix to spot where deals are concentrated.</div>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -83,7 +87,7 @@ if ($stageData['opportunities']['count'] > 0) {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Total Cases -->
                         <div class="col-md-6 mb-3">
                             <div class="d-flex align-items-center">
@@ -101,7 +105,7 @@ if ($stageData['opportunities']['count'] > 0) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Stage Breakdown Chart -->
                     <div class="mt-4">
                         <canvas id="salesStageChart" height="300"></canvas>
@@ -109,14 +113,18 @@ if ($stageData['opportunities']['count'] > 0) {
                 </div>
             </div>
         </div>
-        
+
         <!-- Conversion Rates Widget -->
         <div class="col-xl-4 col-lg-5 col-md-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="ri-exchange-line me-2"></i>Conversion Rates
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Stage-to-stage conversion percentages (BD→Opportunities, Opportunities→Won).">
+                            <i class="ri-question-line"></i>
+                        </button>
                     </h5>
+                    <div class="small text-muted">Track funnel efficiency and where handoffs stall.</div>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -129,7 +137,7 @@ if ($stageData['opportunities']['count'] > 0) {
                                 <div class="progress-bar bg-info" style="width: <?= $conversionRates['bd_to_opportunities'] ?? 0 ?>%"></div>
                             </div>
                         </div>
-                        
+
                         <div class="col-12 mb-3">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="text-muted">Opportunities → Won</span>
@@ -144,42 +152,46 @@ if ($stageData['opportunities']['count'] > 0) {
             </div>
         </div>
     </div>
-    
-    <!-- Top Pipeline Cases Row -->
+
+        <!-- Top Pipeline Cases Row -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="ri-star-line me-2"></i>Top Pipeline Cases - Highest Value & Probability
+                            <i class="ri-star-line me-2"></i>Top Pipeline Cases - Highest Value & Probability
+                            <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="tooltip" title="Ranks active deals by weighted score (value × probability) to focus on high-impact opportunities.">
+                                <i class="ri-question-line"></i>
+                            </button>
                     </h5>
+                        <div class="small text-muted">Use this list to prioritize follow-ups on the most material, likely-to-close deals.</div>
                 </div>
                 <div class="card-body">
                     <?php
                     // Get all active pipeline cases (excluding lost and closed stages)
                     $activePipelineCases = array_filter($sales, function($sale) {
-                        return !in_array($sale->saleStage, ['lost', 'closed_lost', 'closed_won']) && 
-                               $sale->salesCaseEstimate > 0 && 
+                        return !in_array($sale->saleStage, ['lost', 'closed_lost', 'closed_won']) &&
+                               $sale->salesCaseEstimate > 0 &&
                                $sale->probability > 0;
                     });
-                    
+
                     // Sort by value * probability (weighted score) to get top performers
                     usort($activePipelineCases, function($a, $b) {
                         $scoreA = $a->salesCaseEstimate * ($a->probability / 100);
                         $scoreB = $b->salesCaseEstimate * ($b->probability / 100);
                         return $scoreB <=> $scoreA; // Descending order
                     });
-                    
+
                     // Get top 4 cases
                     $topPipelineCases = array_slice($activePipelineCases, 0, 4);
                     ?>
-                    
+
                     <div class="row">
-                        <?php foreach ($topPipelineCases as $index => $case): 
+                        <?php foreach ($topPipelineCases as $index => $case):
                             $weightedScore = $case->salesCaseEstimate * ($case->probability / 100);
                             $stageColor = '';
                             $stageIcon = '';
-                            
+
                             switch($case->saleStage) {
                                 case 'business_development':
                                     $stageColor = 'info';
@@ -216,7 +228,7 @@ if ($stageData['opportunities']['count'] > 0) {
                                         <h5 class="card-title mb-1"><?= htmlspecialchars($case->salesCaseName) ?></h5>
                                         <p class="text-muted mb-2"><?= htmlspecialchars($case->clientName) ?></p>
                                     </div>
-                                    
+
                                     <div class="row text-center mb-3">
                                         <div class="col-6">
                                             <div class="border-end">
@@ -229,7 +241,7 @@ if ($stageData['opportunities']['count'] > 0) {
                                             <small class="text-muted">Probability</small>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="mb-3">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <small class="text-muted">Weighted Score</small>
@@ -239,7 +251,7 @@ if ($stageData['opportunities']['count'] > 0) {
                                             <div class="progress-bar bg-<?= $stageColor ?>" style="width: <?= min(($weightedScore / max(array_column($topPipelineCases, 'salesCaseEstimate'))) * 100, 100) ?>%"></div>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="row">
                                         <div class="col-12 mb-2">
                                             <small class="text-muted d-block">Sales Person</small>
@@ -263,7 +275,7 @@ if ($stageData['opportunities']['count'] > 0) {
                         </div>
                         <?php endforeach; ?>
                     </div>
-                    
+
                     <?php if (count($topPipelineCases) == 0): ?>
                     <div class="text-center py-4">
                         <i class="ri-inbox-line fs-48 text-muted"></i>
@@ -275,10 +287,10 @@ if ($stageData['opportunities']['count'] > 0) {
             </div>
         </div>
     </div>
-    
+
     <!-- Detailed Stage Analysis Row -->
     <div class="row mt-4">
-        
+
         <!-- Business Development Stage -->
         <div class="col-xl-6 col-lg-6 col-md-12 mb-4">
             <div class="card">
@@ -307,12 +319,12 @@ if ($stageData['opportunities']['count'] > 0) {
                             <p class="text-muted mb-0">Avg Prob</p>
                         </div>
                     </div>
-                    
+
                     <!-- Recent Cases -->
                     <div class="mt-3">
                         <h6 class="mb-2">Recent Cases</h6>
                         <div class="list-group list-group-flush">
-                            <?php 
+                            <?php
                             $recentBDCases = array_slice($stageData['business_development']['cases'], -3);
                             foreach ($recentBDCases as $case): ?>
                             <div class="list-group-item px-0 py-2">
@@ -327,7 +339,7 @@ if ($stageData['opportunities']['count'] > 0) {
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    
+
                     <!-- Collapsible Details Table -->
                     <div class="collapse mt-3" id="bdDetails">
                         <div class="card card-body bg-light">
@@ -365,7 +377,7 @@ if ($stageData['opportunities']['count'] > 0) {
                 </div>
             </div>
         </div>
-        
+
         <!-- Opportunities Stage -->
         <div class="col-xl-6 col-lg-6 col-md-12 mb-4">
             <div class="card">
@@ -394,12 +406,12 @@ if ($stageData['opportunities']['count'] > 0) {
                             <p class="text-muted mb-0">Avg Prob</p>
                         </div>
                     </div>
-                    
+
                     <!-- Recent Cases -->
                     <div class="mt-3">
                         <h6 class="mb-2">Recent Cases</h6>
                         <div class="list-group list-group-flush">
-                            <?php 
+                            <?php
                             $recentOppCases = array_slice($stageData['opportunities']['cases'], -3);
                             foreach ($recentOppCases as $case): ?>
                             <div class="list-group-item px-0 py-2">
@@ -414,7 +426,7 @@ if ($stageData['opportunities']['count'] > 0) {
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    
+
                     <!-- Collapsible Details Table -->
                     <div class="collapse mt-3" id="oppDetails">
                         <div class="card card-body bg-light">
@@ -452,7 +464,7 @@ if ($stageData['opportunities']['count'] > 0) {
                 </div>
             </div>
         </div>
-        
+
         <!-- Won Stage -->
         <div class="col-xl-6 col-lg-6 col-md-12 mb-4">
             <div class="card">
@@ -481,12 +493,12 @@ if ($stageData['opportunities']['count'] > 0) {
                             <p class="text-muted mb-0">Avg Prob</p>
                         </div>
                     </div>
-                    
+
                     <!-- Recent Cases -->
                     <div class="mt-3">
                         <h6 class="mb-2">Recent Cases</h6>
                         <div class="list-group list-group-flush">
-                            <?php 
+                            <?php
                             $recentWonCases = array_slice($stageData['won']['cases'], -3);
                             foreach ($recentWonCases as $case): ?>
                             <div class="list-group-item px-0 py-2">
@@ -501,7 +513,7 @@ if ($stageData['opportunities']['count'] > 0) {
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    
+
                     <!-- Collapsible Details Table -->
                     <div class="collapse mt-3" id="wonDetails">
                         <div class="card card-body bg-light">
@@ -539,7 +551,7 @@ if ($stageData['opportunities']['count'] > 0) {
                 </div>
             </div>
         </div>
-        
+
         <!-- Lost Stage -->
         <div class="col-xl-6 col-lg-6 col-md-12 mb-4">
             <div class="card">
@@ -568,12 +580,12 @@ if ($stageData['opportunities']['count'] > 0) {
                             <p class="text-muted mb-0">Avg Prob</p>
                         </div>
                     </div>
-                    
+
                     <!-- Recent Cases -->
                     <div class="mt-3">
                         <h6 class="mb-2">Recent Cases</h6>
                         <div class="list-group list-group-flush">
-                            <?php 
+                            <?php
                             $recentLostCases = array_slice($stageData['lost']['cases'], -3);
                             foreach ($recentLostCases as $case): ?>
                             <div class="list-group-item px-0 py-2">
@@ -588,7 +600,7 @@ if ($stageData['opportunities']['count'] > 0) {
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    
+
                     <!-- Collapsible Details Table -->
                     <div class="collapse mt-3" id="lostDetails">
                         <div class="card card-body bg-light">
@@ -626,7 +638,7 @@ if ($stageData['opportunities']['count'] > 0) {
                 </div>
             </div>
         </div>
-        
+
         <!-- Sales Performance by Sales Person -->
         <div class="col-xl-12 col-lg-12 col-md-12 mb-4">
             <div class="card">
@@ -665,12 +677,12 @@ if ($stageData['opportunities']['count'] > 0) {
                                     $salesPersonData[$personName]['totalCases']++;
                                     $salesPersonData[$personName]['pipelineValue'] += $sale->salesCaseEstimate ?: 0;
                                     $salesPersonData[$personName]['totalProbability'] += $sale->probability ?: 0;
-                                    
+
                                     if ($sale->saleStage == 'won' || $sale->saleStage == 'closed_won') {
                                         $salesPersonData[$personName]['wonValue'] += $sale->salesCaseEstimate ?: 0;
                                     }
                                 }
-                                
+
                                 foreach ($salesPersonData as $personName => $data):
                                     $winRate        = ($data['pipelineValue'] > 0) ? round(($data['wonValue'] / $data['pipelineValue']) * 100, 1) : 0;
                                     $avgProbability = ($data['totalCases'] > 0)    ? round($data['totalProbability'] / $data['totalCases'], 1)    : 0;
