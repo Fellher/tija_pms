@@ -135,6 +135,12 @@ function handleTaskCreate($userID, $DBConn) {
             throw new Exception('Due date cannot be in the past.');
         }
 
+        // Handle file upload
+        $taskAttachment = null;
+        if (isset($_FILES['taskAttachment']) && $_FILES['taskAttachment']['error'] === UPLOAD_ERR_OK) {
+            $taskAttachment = handleTaskFileUpload($_FILES['taskAttachment'], $proposalID);
+        }
+
         // Prepare task data
         $taskData = array(
             'proposalID' => $proposalID,
@@ -147,6 +153,7 @@ function handleTaskCreate($userID, $DBConn) {
             'status' => 'pending',
             'completionPercentage' => 0,
             'isMandatory' => $isMandatory,
+            'taskAttachment' => $taskAttachment,
             'orgDataID' => $orgDataID,
             'entityID' => $entityID,
             'notificationSent' => 'N',
@@ -254,6 +261,12 @@ function handleTaskUpdate($userID, $DBConn) {
         }
         if (isset($_POST['isMandatory'])) {
             $changes['isMandatory'] = $_POST['isMandatory'] === 'Y' ? 'Y' : 'N';
+        }
+
+        // Handle file upload for update
+        if (isset($_FILES['taskAttachment']) && $_FILES['taskAttachment']['error'] === UPLOAD_ERR_OK) {
+            $taskAttachment = handleTaskFileUpload($_FILES['taskAttachment'], $task->proposalID);
+            $changes['taskAttachment'] = $taskAttachment;
         }
 
         $changes['LastUpdatedByID'] = $userID;
@@ -531,5 +544,92 @@ function sendTaskAssignmentNotification($taskID, $assignedTo, $DBConn) {
     } catch (Exception $e) {
         error_log("Failed to send task assignment notification: " . $e->getMessage());
     }
+}
+
+/**
+ * Handle task file upload
+ *
+ * @param array $file The $_FILES array element for the uploaded file
+ * @param int $proposalID The proposal ID for organizing uploads
+ * @return string|null The relative file path if successful, null otherwise
+ * @throws Exception If file validation fails
+ */
+function handleTaskFileUpload($file, $proposalID) {
+    global $config;
+
+    // Define allowed file types
+    $allowedTypes = array(
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+        'image/jpeg',
+        'image/png',
+        'image/gif'
+    );
+
+    $allowedExtensions = array('pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'jpg', 'jpeg', 'png', 'gif');
+
+    // Maximum file size: 10MB
+    $maxFileSize = 10 * 1024 * 1024;
+
+    // Validate file size
+    if ($file['size'] > $maxFileSize) {
+        throw new Exception('File size exceeds maximum allowed (10MB).');
+    }
+
+    // Validate file type
+    $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($fileInfo, $file['tmp_name']);
+    finfo_close($fileInfo);
+
+    if (!in_array($mimeType, $allowedTypes)) {
+        throw new Exception('Invalid file type. Allowed types: PDF, Word, Excel, PowerPoint, Text, Images.');
+    }
+
+    // Validate extension
+    $originalName = $file['name'];
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+    if (!in_array($extension, $allowedExtensions)) {
+        throw new Exception('Invalid file extension.');
+    }
+
+    // Create upload directory if it doesn't exist
+    $baseUploadDir = isset($config['uploadDir']) ? $config['uploadDir'] : 'uploads/';
+    $uploadDir = $baseUploadDir . 'proposal_tasks/' . $proposalID . '/';
+
+    // Get the full server path
+    $fullUploadDir = $_SERVER['DOCUMENT_ROOT'] . '/sbsl.tija.sbsl.co.ke/' . $uploadDir;
+
+    // Alternative: use base path if available
+    if (isset($config['basePath'])) {
+        $fullUploadDir = $config['basePath'] . $uploadDir;
+    }
+
+    if (!file_exists($fullUploadDir)) {
+        if (!mkdir($fullUploadDir, 0755, true)) {
+            error_log("Failed to create upload directory: " . $fullUploadDir);
+            throw new Exception('Failed to create upload directory.');
+        }
+    }
+
+    // Generate unique filename
+    $uniqueFilename = uniqid('task_') . '_' . time() . '.' . $extension;
+    $fullPath = $fullUploadDir . $uniqueFilename;
+    $relativePath = $uploadDir . $uniqueFilename;
+
+    // Move uploaded file
+    if (!move_uploaded_file($file['tmp_name'], $fullPath)) {
+        error_log("Failed to move uploaded file from {$file['tmp_name']} to {$fullPath}");
+        throw new Exception('Failed to save uploaded file.');
+    }
+
+    // Return relative path for database storage
+    return $relativePath;
 }
 

@@ -18,7 +18,7 @@ if ($isValidUser) {
    $checklistAssignmentDocumentFile = null;
 
    // Get the checklist details from the POST request
-   $proposalChecklistItemAssignmentID = (isset($_POST['proposalChecklistItemAssignmentID']) && $_POST['proposalChecklistItemAssignmentID'] != '') ? Utility::clean_string($_POST['proposalChecklistItemAssignmentID']) : null; 
+   $proposalChecklistItemAssignmentID = (isset($_POST['proposalChecklistItemAssignmentID']) && $_POST['proposalChecklistItemAssignmentID'] != '') ? Utility::clean_string($_POST['proposalChecklistItemAssignmentID']) : null;
    $proposalID = (isset($_POST['proposalID']) && $_POST['proposalID'] != '') ? Utility::clean_string($_POST['proposalID']) : null;
    $orgDataID = (isset($_POST['orgDataID']) && $_POST['orgDataID'] != '') ? Utility::clean_string($_POST['orgDataID']) : null;
    $entityID = (isset($_POST['entityID']) && $_POST['entityID'] != '') ? Utility::clean_string($_POST['entityID']) : null;
@@ -32,9 +32,9 @@ if ($isValidUser) {
    $proposalChecklistItemAssignmentStatusID = (isset($_POST['proposalChecklistItemAssignmentStatusID']) && $_POST['proposalChecklistItemAssignmentStatusID'] != '') ? Utility::clean_string($_POST['proposalChecklistItemAssignmentStatusID']) : null;
    $checklistItemAssignedEmployeeID = (isset($_POST['checklistItemAssignedEmployeeID']) && $_POST['checklistItemAssignedEmployeeID'] != '') ? Utility::clean_string($_POST['checklistItemAssignedEmployeeID']) : null;
    $proposalChecklistAssignorID = (isset($_POST['proposalChecklistAssignorID']) && $_POST['proposalChecklistAssignorID'] != '') ? Utility::clean_string($_POST['proposalChecklistAssignorID']) : $userDetails->ID;
-   
 
-  
+
+
 
 // Upload checklist template and assignment document
    if ($proposalChecklistTemplate && $proposalChecklistTemplate['error'] === 0) {
@@ -49,7 +49,7 @@ if ($isValidUser) {
          echo "<h4> File  </h4>";
          var_dump($proposalChecklistTemplateFile);
       }
-   } 
+   }
    if ($checklistAssignmentDocument && $checklistAssignmentDocument['error'] === 0) {
       $maxFileSize = $config['MaxUploadedFileSize'];
       $fileUploadResults= File::upload_file($checklistAssignmentDocument, 'checklist', array('pdf', 'docx', 'doc', 'xlsx', 'csv', 'xls', 'txt'),$maxFileSize , $config, $DBConn);
@@ -63,11 +63,11 @@ if ($isValidUser) {
          var_dump($checklistAssignmentDocumentFile);
       }
    }
-  
+
 
 
    if($proposalChecklistItemAssignmentID && $proposalChecklistItemAssignmentID != '') {
-      
+
       $checklistAssignmentDetails = Proposal::proposal_checklist_item_assignment(['proposalChecklistItemAssignmentID'=> $proposalChecklistItemAssignmentID], true,  $DBConn);
 
       $proposalID && $checklistAssignmentDetails->proposalID != $proposalID ?$changes['proposalID'] = $proposalID : '';
@@ -86,14 +86,96 @@ if ($isValidUser) {
       $changes['lastUpdateByID']=$userDetails->ID;
 
       if($changes){
+         // Track if assignee or status changed for notifications
+         $assigneeChanged = isset($changes['checklistItemAssignedEmployeeID']);
+         $statusChanged = isset($changes['proposalChecklistItemAssignmentStatusID']);
+         $originalAssignee = $checklistAssignmentDetails->checklistItemAssignedEmployeeID;
+         $originalStatus = $checklistAssignmentDetails->proposalChecklistItemAssignmentStatusID;
+
          if(!$DBConn->update_table('tija_proposal_checklist_item_assignment', $changes, array('proposalChecklistItemAssignmentID'=>$proposalChecklistItemAssignmentID))){
             $errors[] = 'Failed to update checklist item assignment.';
          } else {
             $success = "Checklist item assignment updated successfully.";
+
+            // ============================================================
+            // SEND NOTIFICATIONS FOR CHANGES
+            // ============================================================
+            try {
+               // Get proposal and checklist details for notifications
+               $useProposalID = $proposalID ?? $checklistAssignmentDetails->proposalID;
+               $useChecklistID = $proposalChecklistID ?? $checklistAssignmentDetails->proposalChecklistID;
+
+               $proposalDetails = Proposal::proposals(array('proposalID' => $useProposalID), true, $DBConn);
+               $proposalTitle = $proposalDetails ? $proposalDetails->proposalTitle : 'Proposal #' . $useProposalID;
+
+               $checklistDetails = Proposal::proposal_checklist(array('proposalChecklistID' => $useChecklistID), true, $DBConn);
+               $checklistName = $checklistDetails ? $checklistDetails->proposalChecklistName : 'Checklist';
+
+               $requirementName = $proposalChecklistItemAssignmentDescription ?? $checklistAssignmentDetails->proposalChecklistItemAssignmentDescription;
+               $dueDate = $proposalChecklistItemAssignmentDueDate ?? $checklistAssignmentDetails->proposalChecklistItemAssignmentDueDate;
+
+               $actionLink = "{$config['baseURL']}html/?s=sales&ss=proposals&sss=proposal_details&p=proposal_checklist_item_details&checkListItemAssignmentID={$proposalChecklistItemAssignmentID}";
+
+               if (class_exists('ProposalChecklistNotification')) {
+                  // If assignee changed, notify the new assignee
+                  if ($assigneeChanged && $checklistItemAssignedEmployeeID != $originalAssignee) {
+                     $notificationResult = ProposalChecklistNotification::sendAssignmentNotification(array(
+                        'assigneeUserID' => $checklistItemAssignedEmployeeID,
+                        'assignorUserID' => $userDetails->ID,
+                        'proposalID' => $useProposalID,
+                        'proposalTitle' => $proposalTitle,
+                        'checklistID' => $useChecklistID,
+                        'checklistName' => $checklistName,
+                        'requirementName' => $requirementName,
+                        'dueDate' => $dueDate,
+                        'instructions' => 'This requirement has been reassigned to you.',
+                        'actionLink' => $actionLink
+                     ), $DBConn);
+
+                     error_log("Reassignment notification sent: " . ($notificationResult['success'] ?? false ? 'success' : 'failed'));
+                  }
+
+                  // If status changed, send appropriate notification
+                  if ($statusChanged && $proposalChecklistItemAssignmentStatusID != $originalStatus) {
+                     $currentAssignee = $checklistItemAssignedEmployeeID ?? $originalAssignee;
+
+                     // Status 3 = Completed/Approved
+                     if ($proposalChecklistItemAssignmentStatusID == 3) {
+                        ProposalChecklistNotification::sendApprovalNotification(array(
+                           'assigneeUserID' => $currentAssignee,
+                           'reviewerUserID' => $userDetails->ID,
+                           'proposalID' => $useProposalID,
+                           'proposalTitle' => $proposalTitle,
+                           'checklistName' => $checklistName,
+                           'requirementName' => $requirementName,
+                           'comments' => 'Your submission has been approved.',
+                           'actionLink' => $actionLink
+                        ), $DBConn);
+                     }
+                     // Status 4 = Revision Required (adjust based on your status IDs)
+                     elseif ($proposalChecklistItemAssignmentStatusID == 4) {
+                        ProposalChecklistNotification::sendRevisionRequiredNotification(array(
+                           'assigneeUserID' => $currentAssignee,
+                           'reviewerUserID' => $userDetails->ID,
+                           'proposalID' => $useProposalID,
+                           'proposalTitle' => $proposalTitle,
+                           'checklistName' => $checklistName,
+                           'requirementName' => $requirementName,
+                           'feedback' => 'Please review the comments and revise your submission.',
+                           'dueDate' => $dueDate,
+                           'actionLink' => $actionLink
+                        ), $DBConn);
+                     }
+                  }
+               }
+            } catch (Exception $e) {
+               error_log("Error sending update notification: " . $e->getMessage());
+            }
+            // ============================================================
          }
       }
 
-      
+
    } else {
       $proposalID ? $details['proposalID'] = $proposalID : $errors[] = 'Proposal ID is required.';
       $orgDataID ? $details['orgDataID'] = $orgDataID : $errors[] = 'Organisation ID is required.';
@@ -108,7 +190,7 @@ if ($isValidUser) {
       $proposalChecklistAssignorID ? $details['proposalChecklistAssignorID'] = $proposalChecklistAssignorID : $errors[] = 'Proposal Checklist Assignor ID is required.';
       $checklistAssignmentDocumentFile ? $details['proposalChecklistAssignmentDocument'] = $checklistAssignmentDocumentFile : "";
       $proposalChecklistTemplateFile ? $details['proposalChecklistTemplate'] = $proposalChecklistTemplateFile : "";
-     
+
       var_dump($errors);
 
       var_dump($details);
@@ -121,20 +203,68 @@ if ($isValidUser) {
                $errors[] = 'Failed to insert checklist item assignment.';
             } else {
                $success = "Checklist item assignment created successfully.";
+               $newAssignmentID = $DBConn->lastInsertId();
+
+               // ============================================================
+               // SEND NOTIFICATION TO ASSIGNEE
+               // ============================================================
+               // Get proposal and checklist details for the notification
+               try {
+                  // Get proposal details
+                  $proposalDetails = Proposal::proposals(array('proposalID' => $proposalID), true, $DBConn);
+                  $proposalTitle = $proposalDetails ? $proposalDetails->proposalTitle : 'Proposal #' . $proposalID;
+
+                  // Get checklist category details
+                  $checklistDetails = Proposal::proposal_checklist(array('proposalChecklistID' => $proposalChecklistID), true, $DBConn);
+                  $checklistName = $checklistDetails ? $checklistDetails->proposalChecklistName : 'Checklist';
+
+                  // Get assignee's user ID (people.ID maps to employee)
+                  $assigneeUserID = $checklistItemAssignedEmployeeID;
+
+                  // Build action link for the notification
+                  $actionLink = "{$config['baseURL']}html/?s=sales&ss=proposals&sss=proposal_details&p=proposal_checklist_item_details&checkListItemAssignmentID={$newAssignmentID}";
+
+                  // Send the assignment notification
+                  if (class_exists('ProposalChecklistNotification')) {
+                     $notificationResult = ProposalChecklistNotification::sendAssignmentNotification(array(
+                        'assigneeUserID' => $assigneeUserID,
+                        'assignorUserID' => $userDetails->ID,
+                        'proposalID' => $proposalID,
+                        'proposalTitle' => $proposalTitle,
+                        'checklistID' => $proposalChecklistID,
+                        'checklistName' => $checklistName,
+                        'requirementName' => $proposalChecklistItemAssignmentDescription,
+                        'dueDate' => $proposalChecklistItemAssignmentDueDate,
+                        'instructions' => 'Please complete this requirement by the due date.',
+                        'actionLink' => $actionLink
+                     ), $DBConn);
+
+                     if ($notificationResult && isset($notificationResult['success']) && $notificationResult['success']) {
+                        error_log("Checklist assignment notification sent successfully to user {$assigneeUserID}");
+                     } else {
+                        error_log("Failed to send checklist assignment notification: " . ($notificationResult['message'] ?? 'Unknown error'));
+                     }
+                  } else {
+                     error_log("ProposalChecklistNotification class not found - notification not sent");
+                  }
+               } catch (Exception $e) {
+                  // Log the error but don't fail the assignment
+                  error_log("Error sending assignment notification: " . $e->getMessage());
+               }
+               // ============================================================
             }
          }
       }
-      
 
 
 
-   } 
+   }
 
 
 
    var_dump($_FILES);
 
-   
+
    var_dump($errors);
 
    $returnURL= Utility::returnURL($_SESSION['returnURL'], 's=admin&ss=performancep=home');

@@ -284,17 +284,185 @@ function handleGetSubmission($userID, $DBConn) {
 }
 
 /**
- * Send submission notification
+ * Send submission notification to checklist owner
+ *
+ * @param int $submissionID The submission ID
+ * @param object $assignment The assignment details
+ * @param object $DBConn Database connection
  */
 function sendSubmissionNotification($submissionID, $assignment, $DBConn) {
-    // TODO: Integrate with notification system
-    error_log("Submission notification should be sent for submission ID: {$submissionID}");
+    global $config, $userDetails;
+
+    try {
+        // Check if the notification class exists
+        if (!class_exists('ProposalChecklistNotification')) {
+            error_log("ProposalChecklistNotification class not found - submission notification not sent");
+            return;
+        }
+
+        // Get proposal details
+        $proposalDetails = Proposal::proposals(array('proposalID' => $assignment->proposalID), true, $DBConn);
+        $proposalTitle = $proposalDetails ? $proposalDetails->proposalTitle : 'Proposal #' . $assignment->proposalID;
+
+        // Get checklist details to find the owner
+        $checklistDetails = Proposal::proposal_checklist(
+            array('proposalChecklistID' => $assignment->proposalChecklistID),
+            true,
+            $DBConn
+        );
+        $checklistName = $checklistDetails ? $checklistDetails->proposalChecklistName : 'Checklist';
+        $checklistOwnerID = $checklistDetails ? $checklistDetails->assignedEmployeeID : null;
+
+        // Build action link
+        $actionLink = "{$config['baseURL']}html/?s=sales&ss=proposals&sss=proposal_details&p=proposal_checklist_item_details&checkListItemAssignmentID={$assignment->proposalChecklistItemAssignmentID}";
+
+        // Send notification to checklist owner if different from submitter
+        if ($checklistOwnerID && $checklistOwnerID != $userDetails->ID) {
+            $result = ProposalChecklistNotification::sendSubmissionNotification(array(
+                'ownerUserID' => $checklistOwnerID,
+                'assigneeUserID' => $userDetails->ID,
+                'proposalID' => $assignment->proposalID,
+                'proposalTitle' => $proposalTitle,
+                'checklistName' => $checklistName,
+                'requirementName' => $assignment->proposalChecklistItemAssignmentDescription ?? 'Checklist Item',
+                'submissionDate' => date('M d, Y H:i'),
+                'attachmentCount' => isset($_FILES['submissionFiles']) ? count($_FILES['submissionFiles']['name']) : 0,
+                'actionLink' => $actionLink
+            ), $DBConn);
+
+            if ($result && isset($result['success']) && $result['success']) {
+                error_log("Submission notification sent to checklist owner (ID: {$checklistOwnerID})");
+            } else {
+                error_log("Failed to send submission notification: " . ($result['message'] ?? 'Unknown error'));
+            }
+        }
+
+        // Also notify the assignor if different from owner and submitter
+        $assignorID = $assignment->proposalChecklistAssignorID ?? null;
+        if ($assignorID && $assignorID != $userDetails->ID && $assignorID != $checklistOwnerID) {
+            ProposalChecklistNotification::sendSubmissionNotification(array(
+                'ownerUserID' => $assignorID,
+                'assigneeUserID' => $userDetails->ID,
+                'proposalID' => $assignment->proposalID,
+                'proposalTitle' => $proposalTitle,
+                'checklistName' => $checklistName,
+                'requirementName' => $assignment->proposalChecklistItemAssignmentDescription ?? 'Checklist Item',
+                'submissionDate' => date('M d, Y H:i'),
+                'attachmentCount' => isset($_FILES['submissionFiles']) ? count($_FILES['submissionFiles']['name']) : 0,
+                'actionLink' => $actionLink
+            ), $DBConn);
+        }
+
+    } catch (Exception $e) {
+        error_log("Error sending submission notification: " . $e->getMessage());
+    }
 }
 
 /**
- * Send review notification
+ * Send review notification to the submitter
+ *
+ * @param int $submissionID The submission ID
+ * @param string $reviewStatus The review status (approved, rejected, revision_requested)
+ * @param object $DBConn Database connection
  */
 function sendReviewNotification($submissionID, $reviewStatus, $DBConn) {
-    // TODO: Integrate with notification system
-    error_log("Review notification should be sent for submission ID: {$submissionID}, Status: {$reviewStatus}");
+    global $config, $userDetails;
+
+    try {
+        if (!class_exists('ProposalChecklistNotification')) {
+            error_log("ProposalChecklistNotification class not found - review notification not sent");
+            return;
+        }
+
+        // Get submission details
+        $submission = Proposal::proposal_checklist_submissions(
+            array('submissionID' => $submissionID),
+            true,
+            $DBConn
+        );
+
+        if (!$submission) {
+            error_log("Could not find submission {$submissionID} for review notification");
+            return;
+        }
+
+        // Get assignment details
+        $assignment = Proposal::proposal_checklist_item_assignment_full(
+            array('proposalChecklistItemAssignmentID' => $submission->proposalChecklistItemAssignmentID),
+            true,
+            $DBConn
+        );
+
+        if (!$assignment) {
+            error_log("Could not find assignment for review notification");
+            return;
+        }
+
+        // Get proposal details
+        $proposalDetails = Proposal::proposals(array('proposalID' => $assignment->proposalID), true, $DBConn);
+        $proposalTitle = $proposalDetails ? $proposalDetails->proposalTitle : 'Proposal #' . $assignment->proposalID;
+
+        // Get checklist details
+        $checklistDetails = Proposal::proposal_checklist(
+            array('proposalChecklistID' => $assignment->proposalChecklistID),
+            true,
+            $DBConn
+        );
+        $checklistName = $checklistDetails ? $checklistDetails->proposalChecklistName : 'Checklist';
+
+        $requirementName = $assignment->proposalChecklistItemAssignmentDescription ?? 'Checklist Item';
+        $submitterID = $submission->submittedBy ?? $assignment->checklistItemAssignedEmployeeID;
+
+        $actionLink = "{$config['baseURL']}html/?s=sales&ss=proposals&sss=proposal_details&p=proposal_checklist_item_details&checkListItemAssignmentID={$assignment->proposalChecklistItemAssignmentID}";
+
+        $reviewNotes = isset($_POST['reviewNotes']) ? Utility::clean_string($_POST['reviewNotes']) : '';
+
+        switch ($reviewStatus) {
+            case 'approved':
+                ProposalChecklistNotification::sendApprovalNotification(array(
+                    'assigneeUserID' => $submitterID,
+                    'reviewerUserID' => $userDetails->ID,
+                    'proposalID' => $assignment->proposalID,
+                    'proposalTitle' => $proposalTitle,
+                    'checklistName' => $checklistName,
+                    'requirementName' => $requirementName,
+                    'comments' => $reviewNotes ?: 'Your submission has been approved.',
+                    'actionLink' => $actionLink
+                ), $DBConn);
+
+                // Check if all items are completed for this proposal
+                $completion = Proposal::calculate_proposal_completion($assignment->proposalID, $DBConn);
+                if ($completion && isset($completion['total']) && $completion['total'] == 100) {
+                    // All items completed - notify proposal owner
+                    ProposalChecklistNotification::sendCompletionNotification(array(
+                        'ownerUserID' => $proposalDetails->employeeID ?? $userDetails->ID,
+                        'proposalID' => $assignment->proposalID,
+                        'proposalTitle' => $proposalTitle,
+                        'totalItems' => $completion['totalItems'] ?? 0,
+                        'actionLink' => "{$config['baseURL']}html/?s=sales&ss=proposals&sss=proposal_details&proposalID={$assignment->proposalID}"
+                    ), $DBConn);
+                }
+                break;
+
+            case 'rejected':
+            case 'revision_requested':
+                ProposalChecklistNotification::sendRevisionRequiredNotification(array(
+                    'assigneeUserID' => $submitterID,
+                    'reviewerUserID' => $userDetails->ID,
+                    'proposalID' => $assignment->proposalID,
+                    'proposalTitle' => $proposalTitle,
+                    'checklistName' => $checklistName,
+                    'requirementName' => $requirementName,
+                    'feedback' => $reviewNotes ?: 'Please review the comments and revise your submission.',
+                    'dueDate' => $assignment->proposalChecklistItemAssignmentDueDate ?? date('Y-m-d', strtotime('+3 days')),
+                    'actionLink' => $actionLink
+                ), $DBConn);
+                break;
+        }
+
+        error_log("Review notification sent for submission {$submissionID} with status: {$reviewStatus}");
+
+    } catch (Exception $e) {
+        error_log("Error sending review notification: " . $e->getMessage());
+    }
 }

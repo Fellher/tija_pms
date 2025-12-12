@@ -117,6 +117,33 @@ $allEmployees = Employee::employees(array('orgDataID'=>$orgDataID, 'entityID'=>$
          </select>
       </div>
 
+      <!-- File Attachment -->
+      <div class="form-group mb-3">
+         <label for="taskAttachment" class="form-label fw-semibold">
+            <i class="ri-attachment-2 me-1"></i>Attachment
+         </label>
+         <input type="file"
+                class="form-control"
+                id="taskAttachment"
+                name="taskAttachment"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif">
+         <small class="text-muted">
+            Supported: PDF, Word, Excel, PowerPoint, Images (Max 10MB)
+         </small>
+         <!-- Show existing attachment if editing -->
+         <div id="existingAttachment" class="mt-2 d-none">
+            <div class="alert alert-info py-2 d-flex align-items-center justify-content-between">
+               <span>
+                  <i class="ri-file-line me-1"></i>
+                  <span id="existingAttachmentName">Existing file</span>
+               </span>
+               <a href="#" id="viewExistingAttachment" target="_blank" class="btn btn-sm btn-outline-primary">
+                  <i class="ri-eye-line"></i> View
+               </a>
+            </div>
+         </div>
+      </div>
+
       <!-- Error/Success Messages -->
       <div id="taskFormMessages" class="mt-3"></div>
 </div>
@@ -446,6 +473,12 @@ $allEmployees = Employee::employees(array('orgDataID'=>$orgDataID, 'entityID'=>$
             if (dueDateInput && dueDateInput._flatpickr) {
                dueDateInput._flatpickr.clear();
             }
+
+            // Hide existing attachment display
+            const existingAttachmentDiv = document.getElementById('existingAttachment');
+            if (existingAttachmentDiv) {
+               existingAttachmentDiv.classList.add('d-none');
+            }
          }
       });
    }
@@ -492,6 +525,25 @@ $allEmployees = Employee::employees(array('orgDataID'=>$orgDataID, 'entityID'=>$
             if (statusSelect) {
                statusSelect.value = task.status || 'pending';
                statusGroup.classList.remove('d-none');
+            }
+
+            // Handle existing attachment display
+            const existingAttachmentDiv = document.getElementById('existingAttachment');
+            const existingAttachmentName = document.getElementById('existingAttachmentName');
+            const viewExistingAttachment = document.getElementById('viewExistingAttachment');
+
+            if (task.taskAttachment && task.taskAttachment.trim() !== '') {
+               if (existingAttachmentDiv && existingAttachmentName && viewExistingAttachment) {
+                  existingAttachmentDiv.classList.remove('d-none');
+                  // Extract filename from path
+                  const fileName = task.taskAttachment.split('/').pop();
+                  existingAttachmentName.textContent = fileName;
+                  viewExistingAttachment.href = '<?= $config['DataDir'] ?? '' ?>' + task.taskAttachment;
+               }
+            } else {
+               if (existingAttachmentDiv) {
+                  existingAttachmentDiv.classList.add('d-none');
+               }
             }
 
             // Show modal
