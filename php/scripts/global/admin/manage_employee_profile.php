@@ -50,11 +50,11 @@ try {
     $DBConn->set_charset('utf8mb4');
 
     // Check if user is logged in
-    if (!isset($_SESSION['userID']) || empty($_SESSION['userID'])) {
+    if (!isset($userDetails->ID) || empty($userDetails->ID)) {
         throw new Exception('Unauthorized access. Please log in.');
     }
 
-    $userID = $_SESSION['userID'];
+    $userID = $userDetails->ID;
 
     // Get request method
     $requestMethod = $_SERVER['REQUEST_METHOD'];

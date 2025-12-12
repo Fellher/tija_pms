@@ -38,7 +38,7 @@ if ($isValidUser) {
       $proposalChecklistItemCategoryDetails->LastUpdateByID !== $userDetails->ID ? $changes['LastUpdateByID'] = $userDetails->ID : "";
       if(!$errors){
          if($changes) {
-            $changes['LastUpdatedByID']=$userDetails->ID;            
+            $changes['LastUpdatedByID']=$userDetails->ID;
             if(!$DBConn->update_table('tija_proposal_checklist_item_categories', $changes, array('proposalChecklistItemCategoryID'=>$proposalChecklistItemCategoryID))) {
                $errors[] = 'Error updating Proposal Checklist Item Category';
             }
@@ -48,7 +48,7 @@ if ($isValidUser) {
 
    var_dump($errors);
 
-   $returnURL= Utility::returnURL($_SESSION['returnURL'], 's=admin&ss=performancep=home');
+   $returnURL= Utility::returnURL($_SESSION['returnURL'], 's=admin&ss=performance&p=proposal_checklist_item_categories');
 	var_dump($returnURL);
 } else {
 	$errors[] = 'You need to log in as a valid administrator to do that.';

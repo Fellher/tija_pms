@@ -9,7 +9,7 @@ $base = '../../../../';
 require_once $base . 'php/includes.php';
 
 // Check authentication
-if (!isset($_SESSION['userID']) || !$isValidUser) {
+if (!isset($userDetails->ID) || !$isValidUser) {
     http_response_code(403);
     Alert::error("Access denied", true);
     header('Location: ' . $base . 'html/');
@@ -36,7 +36,7 @@ try {
     $updateData = [
         'Lapsed' => 'Y',
         'LastUpdate' => $config['currentDateTimeFormated'],
-        'LastUpdateByID' => $_SESSION['userID']
+        'LastUpdateByID' => $userDetails->ID
     ];
 
     $result = $DBConn->update_table('tija_holidays', $updateData, ['holidayID' => $holidayID]);

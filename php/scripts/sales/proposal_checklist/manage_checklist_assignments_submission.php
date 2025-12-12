@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 $base = '../../../../';
@@ -29,11 +28,11 @@ if ($isValidUser) {
    if (isset($proposalChecklistItemUploadfile) && !empty($proposalChecklistItemUploadfile)) {
 
       var_dump($proposalChecklistItemUploadfile);
-       
+
       $fileUploaded = File::multiple_file_upload(
          $_FILES,
-         'proposal_checklist_items', 
-          array('jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'), 
+         'proposal_checklist_items',
+          array('jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'),
           10 * 1024 * 1024,
          $config, $DBConn
       ); // 10 MB limit
@@ -43,7 +42,7 @@ if ($isValidUser) {
       if ($fileUploaded['success']) {
          $fileNames = $fileUploaded['fileNames'];
          $filePaths = $fileUploaded['uploadedFilePaths'];
-         
+
       } else {
          $errors[] = $fileUploaded['error'];
       }
@@ -91,7 +90,7 @@ if ($isValidUser) {
       $proposalChecklistItemAssignmentSubmissionDetails = Proposal::proposal_checklist_item_assignment_submissions(['proposalChecklistItemAssignmentSubmissionID' => $proposalChecklistItemAssignmentSubmissionID], true, $DBConn );
       var_dump($proposalChecklistItemAssignmentSubmissionDetails);
       $proposalChecklistItemAssignmentID && $proposalChecklistItemAssignmentID != $proposalChecklistItemAssignmentSubmissionDetails->proposalChecklistItemAssignmentID ? $changes['proposalChecklistItemAssignmentID'] = Utility::clean_string($proposalChecklistItemAssignmentID) : null;
-      $checklistItemAssignedEmployeeID && $checklistItemAssignedEmployeeID != $proposalChecklistItemAssignmentSubmissionDetails->checklistItemAssignedEmployeeID ? $changes['checklistItemAssignedEmployeeID'] = Utility::clean_string($checklistItemAssignedEmployeeID) : null; 
+      $checklistItemAssignedEmployeeID && $checklistItemAssignedEmployeeID != $proposalChecklistItemAssignmentSubmissionDetails->checklistItemAssignedEmployeeID ? $changes['checklistItemAssignedEmployeeID'] = Utility::clean_string($checklistItemAssignedEmployeeID) : null;
       $proposalChecklistItemID && $proposalChecklistItemID != $proposalChecklistItemAssignmentSubmissionDetails->proposalChecklistItemID ? $changes['proposalChecklistItemID'] = Utility::clean_string($proposalChecklistItemID) : null;
       $proposalChecklistItemAssignmentSubmissionDescription && $proposalChecklistItemAssignmentSubmissionDescription != $proposalChecklistItemAssignmentSubmissionDetails->proposalChecklistItemAssignmentSubmissionDescription ? $changes['proposalChecklistItemAssignmentSubmissionDescription'] = Utility::clean_string($proposalChecklistItemAssignmentSubmissionDescription) : null;
       $proposalChecklistItemAssignmentSubmissionDate && $proposalChecklistItemAssignmentSubmissionDate != $proposalChecklistItemAssignmentSubmissionDetails->proposalChecklistItemAssignmentSubmissionDate ? $changes['proposalChecklistItemAssignmentSubmissionDate'] = Utility::clean_string($proposalChecklistItemAssignmentSubmissionDate) : null;
@@ -103,7 +102,7 @@ if ($isValidUser) {
          $changes['LastUpdateBy'] = $userDetails->ID;
          $changes['LastUpdateDate'] = date('Y-m-d H:i:s');
          var_dump($changes);
-         if(!$DBConn->update('tija_proposal_checklist_item_assignment_submissions', $changes, ['proposalChecklistItemAssignmentSubmissionID' => $proposalChecklistItemAssignmentSubmissionID])){
+         if(!$DBConn->update_table('tija_proposal_checklist_item_assignment_submissions', $changes, ['proposalChecklistItemAssignmentSubmissionID' => $proposalChecklistItemAssignmentSubmissionID])){
             $errors[] = 'Could not update submission details. Please try again.';
          } else {
             $success = 'Submission details updated successfully.';

@@ -96,7 +96,7 @@ class GoalHierarchy {
         }
 
         $results = array();
-        $cascadedByUserID = $_SESSION['userID'] ?? 1; // Get from session
+        $cascadedByUserID = $userDetails->ID ?? 1; // Get from session
 
         foreach ($targets as $target) {
             $targetType = $target['type']; // 'Entity' or 'User'
@@ -176,7 +176,7 @@ class GoalHierarchy {
         }
 
         $results = array();
-        $cascadedByUserID = $_SESSION['userID'] ?? 1;
+        $cascadedByUserID = $userDetails->ID ?? 1;
 
         foreach ($targets as $target) {
             $targetType = $target['type'];
@@ -245,7 +245,7 @@ class GoalHierarchy {
         }
 
         $results = array();
-        $cascadedByUserID = $_SESSION['userID'] ?? 1;
+        $cascadedByUserID = $userDetails->ID ?? 1;
 
         foreach ($employees as $employee) {
             // Create goal for employee

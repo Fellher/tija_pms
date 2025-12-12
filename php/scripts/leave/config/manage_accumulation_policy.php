@@ -19,7 +19,7 @@ if (!$isAdmin && !$isValidAdmin && !$isHRManager) {
     exit;
 }
 
-$currentUserID = $userDetails->ID ?? $_SESSION['userID'] ?? 0;
+$currentUserID = $userDetails->ID ?? $userDetails->ID ?? 0;
 $entityID = $_SESSION['entityID'] ?? 1;
 
 // Get request method and action

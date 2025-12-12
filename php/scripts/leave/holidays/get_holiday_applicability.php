@@ -11,7 +11,7 @@ require_once $base . 'php/includes.php';
 header('Content-Type: application/json');
 
 // Check authentication
-if (!isset($_SESSION['userID']) || !$isValidUser) {
+if (!isset($userDetails->ID) || !$isValidUser) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;

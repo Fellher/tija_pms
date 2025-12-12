@@ -110,7 +110,7 @@ try {
         throw new Exception('No active leave period found for this entity. Please configure leave periods first.');
     }
 
-    $uploadedBy = (int)($_SESSION['userID'] ?? 0);
+    $uploadedBy = (int)($userDetails->ID ?? 0);
     $rowNumber = 1;
     $matchedEmployees = 0;
     $applicationsCreated = 0;

@@ -100,7 +100,7 @@ try {
     }
 
     $uploadBatch = 'LB' . date('YmdHis');
-    $uploadedBy = (int)($_SESSION['userID'] ?? 0);
+    $uploadedBy = (int)($userDetails->ID ?? 0);
 
     $rowNumber = 1;
     $matchedEmployees = 0;

@@ -49,7 +49,7 @@ try {
     }
 
     // Get current user ID
-    $userID = isset($_SESSION['userID']) ? intval($_SESSION['userID']) : (isset($UserID) ? intval($UserID) : 1);
+    $userID = isset($userDetails->ID) ? intval($userDetails->ID) : (isset($UserID) ? intval($UserID) : 1);
 
     if (empty($userID)) {
         throw new Exception("User ID not found in session");

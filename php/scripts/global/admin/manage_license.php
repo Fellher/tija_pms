@@ -74,7 +74,7 @@ if (count($errors) == 0) {
                     'licenseStatus' => $licenseStatus,
                     'features' => $featuresJson,
                     'licenseNotes' => $licenseNotes,
-                    'LastUpdateByID' => isset($_SESSION['userID']) ? $_SESSION['userID'] : (isset($userDetails->ID) ? $userDetails->ID : 1)
+                    'LastUpdateByID' => isset($userDetails->ID) ? $userDetails->ID : (isset($userDetails->ID) ? $userDetails->ID : 1)
                 );
 
                 $whereClause = array('licenseID' => $licenseID);
@@ -109,7 +109,7 @@ if (count($errors) == 0) {
                         'licenseStatus' => $licenseStatus,
                         'features' => $featuresJson,
                         'licenseNotes' => $licenseNotes,
-                        'LastUpdateByID' => isset($_SESSION['userID']) ? $_SESSION['userID'] : (isset($userDetails->ID) ? $userDetails->ID : 1)
+                        'LastUpdateByID' => isset($userDetails->ID) ? $userDetails->ID : (isset($userDetails->ID) ? $userDetails->ID : 1)
                     );
 
                     if ($DBConn->insert_data('tija_licenses', $insertData)) {

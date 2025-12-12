@@ -23,7 +23,7 @@ try {
         exit;
     }
 
-    $userID = $_SESSION['userID'] ?? null;
+    $userID = $userDetails->ID ?? null;
     if (!$userID) {
         throw new Exception('User not authenticated');
     }

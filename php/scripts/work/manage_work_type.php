@@ -30,7 +30,7 @@ if ( $isValidUser) {
       $workTypeCode ? $details['workTypeCode'] = $workTypeCode : $errors[] = "Please submit valid work type code";
 
       if(!$errors){
-      
+
          if($details){
             $details['LastUpdate'] = $config['currentDateTimeFormated'];
             if(!$DBConn->insert_data('tija_work_types', $details)){
@@ -51,12 +51,12 @@ if ( $isValidUser) {
       //  var_dump($changes);
       //  die();
       if(!$errors){
-      
+
          if($changes){
 
             var_dump($changes);
             $changes['LastUpdate'] = $config['currentDateTimeFormated'];
-            $changes['LastUpdateByID'] = isset($_SESSION['userID']) ? $_SESSION['userID'] : $userDetails->ID;   
+            $changes['LastUpdateByID'] = isset($userDetails->ID) ? $userDetails->ID : $userDetails->ID;
             //  var_dump($changes);
             //  die();
             if(!$DBConn->update_table('tija_work_types', array_merge($changes, array('LastUpdate'=>$config['currentDateTimeFormated'])), array('workTypeID'=>$workTypeID))){

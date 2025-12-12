@@ -108,7 +108,7 @@ try {
                     'colorCode' => $colorCode,
                     'iconClass' => $iconClass,
                     'isPopular' => $isPopular,
-                    'LastUpdateByID' => $_SESSION['userID']
+                    'LastUpdateByID' => $userDetails->ID
                 );
 
                 $whereClause = array('licenseTypeID' => $licenseTypeID);
@@ -163,7 +163,7 @@ try {
                     'iconClass' => $iconClass,
                     'isPopular' => $isPopular,
                     'displayOrder' => $displayOrder,
-                    'LastUpdateByID' => $_SESSION['userID']
+                    'LastUpdateByID' => $userDetails->ID
                 );
 
                 if ($DBConn->insert_into_db_table('tija_license_types', $insertData)) {
@@ -215,7 +215,7 @@ try {
 
             $updateData = array(
                 'Suspended' => 'Y',
-                'LastUpdateByID' => $_SESSION['userID']
+                'LastUpdateByID' => $userDetails->ID
             );
 
             $whereClause = array('licenseTypeID' => $licenseTypeID);

@@ -10,7 +10,7 @@ $base = '../../../../';
 require_once $base . 'php/includes.php';
 
 // Check admin permissions
-if (!isset($_SESSION['userID']) || !$isAdmin) {
+if (!isset($userDetails->ID) || !$isAdmin) {
     http_response_code(403);
     die('Access denied');
 }

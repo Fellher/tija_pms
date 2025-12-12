@@ -10,13 +10,13 @@ $base = '../../../../';
 require_once $base . 'php/includes.php';
 
 // Check authentication
-if (!isset($_SESSION['userID']) || !$isValidUser) {
+if (!isset($userDetails->ID) || !$isValidUser) {
     http_response_code(403);
     header('Location: ' . $base . 'html/?s=core&p=signin');
     exit;
 }
 
-$currentUserID = $_SESSION['userID'];
+$currentUserID = $userDetails->ID;
 $entityID = $_SESSION['entityID'] ?? 1;
 
 $response = ['success' => false, 'message' => ''];

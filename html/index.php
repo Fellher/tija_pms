@@ -97,9 +97,9 @@ $nodeID="";
 		<?php
 		if($isValidUser) {?>
 		 <!-- Loader -->
-		 	<div id="loader" class="d-none" >
+		 	<!-- <div id="loader" class="d-none" >
          	<img src="<?php echo $base ?>assets/img/media/loader.svg" alt="">
-     		</div>
+     		</div> -->
 			<?php
 		} ?>
 		<!-- Document Wrapper

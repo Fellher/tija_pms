@@ -20,7 +20,7 @@ $debugData = array(
     'post_data' => $_POST,
     'get_data' => $_GET,
     'session_data' => array(
-        'userID' => isset($_SESSION['userID']) ? $_SESSION['userID'] : 'NOT SET',
+        'userID' => isset($userDetails->ID) ? $userDetails->ID : 'NOT SET',
         'isValidUser' => isset($isValidUser) ? $isValidUser : 'NOT SET'
     ),
     'phase_analysis' => array(),

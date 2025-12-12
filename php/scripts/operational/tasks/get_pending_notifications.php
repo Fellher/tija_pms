@@ -9,11 +9,10 @@
  * @version    1.0.0
  */
 
-// Define base path before including config
-$base = '../../../../';
 
+// Define base path before including config
 session_start();
-$base = '../../../';
+$base = '../../../../';
 set_include_path($base);
 require_once 'php/includes.php';
 

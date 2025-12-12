@@ -11,13 +11,13 @@ require_once $base . 'php/includes.php';
 header('Content-Type: application/json');
 
 // Check authentication and admin permissions
-if (!isset($_SESSION['userID']) || !$isValidUser || (!$isAdmin && !$isValidAdmin && !$isHRManager)) {
+if (!isset($userDetails->ID) || !$isValidUser || (!$isAdmin && !$isValidAdmin && !$isHRManager)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit;
 }
 
-$currentUserID = $_SESSION['userID'];
+$currentUserID = $userDetails->ID;
 $entityID = $_SESSION['entityID'] ?? 1;
 
 try {

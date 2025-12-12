@@ -17,7 +17,7 @@ if ($userDetails->userRole !== 'admin' && $userDetails->userRole !== 'hr_admin')
 }
 
 $entityID = $_SESSION['entityID'] ?? 1;
-$currentUserID = $_SESSION['userID'];
+$currentUserID = $userDetails->ID;
 
 // Get current page parameters
 $action = $_GET['action'] ?? 'dashboard';

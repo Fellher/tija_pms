@@ -14,12 +14,12 @@ require_once '../../../includes/classes/Alert.php';
 // Start session and check authentication
 session_start();
 
-if (!isset($_SESSION['userID']) || empty($_SESSION['userID'])) {
+if (!isset($userDetails->ID) || empty($userDetails->ID)) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }
 
-$userID = $_SESSION['userID'];
+$userID = $userDetails->ID;
 $DBConn = Database::getConnection();
 
 // Get action type

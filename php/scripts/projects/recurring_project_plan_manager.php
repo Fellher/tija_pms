@@ -317,7 +317,7 @@ function replicate_plan_for_cycle($projectID, $billingCycleID, $DBConn) {
             'billingMilestone' => isset($template->billingMilestone) ? $template->billingMilestone : 'N',
             'DateAdded' => date('Y-m-d H:i:s'),
             'LastUpdate' => date('Y-m-d H:i:s'),
-            'LastUpdatedByID' => isset($_SESSION['userID']) ? $_SESSION['userID'] : 0,
+            'LastUpdatedByID' => isset($userDetails->ID) ? $userDetails->ID : 0,
             'Lapsed' => 'N',
             'Suspended' => 'N'
         );
